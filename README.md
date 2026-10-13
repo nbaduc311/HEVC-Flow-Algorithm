@@ -46,7 +46,7 @@ Nếu báo thiếu encoder, chạy `./build.sh`. Nếu thiếu FFmpeg, cài `ffm
 
 ## Bài trình bày gợi ý
 
-Trong **Luồng thử CU**, ảnh nhỏ ở cột trái là toàn CTU 64×64; viền vàng chỉ vị trí CU. Hai hình phóng to bên phải cùng lấy đúng vùng CU: một hình vẽ phân hoạch của lượt thử đang chọn, một hình vẽ phân hoạch cuối giống Bản đồ CU/PU. Ảnh nền gốc/tái tạo được đồng bộ giữa hai vùng; nền này không phải reconstruction riêng của từng ứng viên. Chuyển sang bản đồ giữ POC và vị trí CU, rồi quay lại vẫn giữ lượt thử. Nếu CU thử không còn trong cây cuối, trang ghi rõ CU cuối chứa vị trí đó.
+Trong **Luồng thử CU**, ảnh nhỏ ở cột trái là toàn CTU 64×64; viền vàng chỉ vị trí CU. Hai hình phóng to bên phải cùng lấy đúng vùng CU: một hình vẽ phân hoạch của lượt thử đang chọn, một hình vẽ phân hoạch cuối giống Bản đồ CU/PU. Ảnh nền gốc/tái tạo được đồng bộ giữa hai vùng; nền này không phải reconstruction riêng của từng ứng viên. Nút “Xem trên bản đồ ↗” mở bản đồ trong tab mới, giữ lần chạy, POC, vị trí CU, lượt thử và nguồn ảnh qua URL. Tab luồng thử hiện tại vẫn giữ nguyên lựa chọn. Nếu CU thử không còn trong cây cuối, trang ghi rõ CU cuối chứa vị trí đó.
 
 Ví dụ mốc QP 32, POC 0, CU 8×8 tại (256,128): HM thử Intra 2Nx2N (1 PU 8×8, J=141771.1512), rồi Intra NxN (4 PU 4×4, J=111998.5883). Phương án NxN có chi phí thấp hơn và xuất hiện trên bản đồ cuối. Nút “Đến lượt cùng phân hoạch với kết quả cuối” giúp đối chiếu hai màn hình.
 
