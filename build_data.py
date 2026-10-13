@@ -9,7 +9,7 @@ TRACE = ROOT / "data" / "trace.jsonl"
 OUTPUT = ROOT / "web" / "lab-data.js"
 
 frames = {poc: {"poc": poc, "sliceType": "?", "ctus": []} for poc in range(5)}
-for line in TRACE.read_text().splitlines():
+for line in TRACE.read_text(encoding='utf-8').splitlines():
     event = json.loads(line)
     if event.get("event") != "CTU_PARTITION":
         continue
@@ -38,5 +38,5 @@ bundle = {
     "config": "encoder_lowdelay_P_main10.cfg",
     "frames": [frames[poc] for poc in range(5)],
 }
-OUTPUT.write_text("window.INTER_LAB_DATA = " + json.dumps(bundle, separators=(",", ":")) + ";\n")
+OUTPUT.write_text("window.INTER_LAB_DATA = " + json.dumps(bundle, separators=(",", ":")) + ";\n", encoding='utf-8')
 print(f"Wrote {OUTPUT} ({OUTPUT.stat().st_size:,} bytes)")

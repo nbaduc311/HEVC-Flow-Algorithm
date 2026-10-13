@@ -50,12 +50,12 @@ def validate(raw):
 def atomic_json(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix('.tmp')
-    tmp.write_text(json.dumps(value, ensure_ascii=False, separators=(',', ':'), allow_nan=False))
+    tmp.write_text(json.dumps(value, ensure_ascii=False, separators=(',', ':'), allow_nan=False), encoding='utf-8')
     tmp.replace(path)
 
 def manifest():
     path=PUBLIC/'manifest.json'
-    return json.loads(path.read_text()) if path.exists() else []
+    return json.loads(path.read_text(encoding='utf-8')) if path.exists() else []
 
 def run_experiment(config, run_id=None, label=None):
     config=validate(config)
@@ -77,12 +77,12 @@ def run_experiment(config, run_id=None, label=None):
     env=os.environ | dict(VISUAL_CTU_X='0', VISUAL_CTU_Y='0', VISUAL_CU_SIZE='0', VISUAL_POC='-1', VISUAL_DUMP_EXIT='0',
         VISUAL_OUTPUT_DIR=str(out), INTER_LAB_TRACE='1', INTER_LAB_CTU_X=str(config['ctuX']), INTER_LAB_CTU_Y=str(config['ctuY']))
     start=time.perf_counter()
-    with (out/'encoder.log').open('w') as log:
+    with (out/'encoder.log').open('w', encoding='utf-8') as log:
         proc=subprocess.run(args, cwd=ROOT/'hm', env=env, stdout=log, stderr=subprocess.STDOUT, timeout=180)
     if proc.returncode:
-        raise RuntimeError('HM thất bại: '+(out/'encoder.log').read_text()[-2000:])
+        raise RuntimeError('HM thất bại: '+(out/'encoder.log').read_text(encoding='utf-8')[-2000:])
     wall=time.perf_counter()-start
-    log=(out/'encoder.log').read_text()
+    log=(out/'encoder.log').read_text(encoding='utf-8')
     frames=[]
     pattern=r'POC\s+(\d+)\s+TId:\s*(\d+)\s+\(\s*(\w)-SLICE, nQP\s+(-?\d+) QP\s+(-?\d+)\s*\)\s+(\d+) bits \[Y\s+([\d.]+) dB\s+U\s+([\d.]+) dB\s+V\s+([\d.]+) dB\].*?\[L0([^\]]*)\]\s*\[L1([^\]]*)\]'
     for m in re.finditer(pattern, log):
@@ -90,13 +90,13 @@ def run_experiment(config, run_id=None, label=None):
         frames.append(dict(poc=int(poc), tid=int(tid), sliceType=kind, qp=int(qp), nqp=int(nqp), bits=int(bits), psnrY=float(y),psnrU=float(u),psnrV=float(v), l0=list(map(int,l0.split())), l1=list(map(int,l1.split())),ctus=[]))
     if len(frames)!=5: raise RuntimeError('Không đọc được 5 dòng POC từ encoder.log')
     frames.sort(key=lambda f:f['poc'])
-    for line in (out/'trace.jsonl').open():
+    for line in (out/'trace.jsonl').open(encoding='utf-8'):
         e=json.loads(line)
         if e['event']=='CTU_PARTITION':
             frames[e['poc']]['ctus'].append(dict(x=e['ctu_x']*64,y=e['ctu_y']*64,nodes=e['nodes']))
     decisions=out/'decisions.jsonl'
     if not decisions.exists(): raise RuntimeError('Encoder chưa có trace RD. Hãy build lại HM.')
-    events=[json.loads(line) for line in decisions.open()]
+    events=[json.loads(line) for line in decisions.open(encoding='utf-8')]
     if not events: raise RuntimeError('Không có trace trong CTU đã chọn.')
     for i,e in enumerate(events): e['seq']=i+1
     for f in frames:
@@ -117,13 +117,13 @@ def run_experiment(config, run_id=None, label=None):
         created=datetime.now(timezone.utc).isoformat())
     command=' '.join(f'{k}={shlex.quote(env[k])}' for k in ('VISUAL_CTU_X','VISUAL_CTU_Y','VISUAL_CU_SIZE','VISUAL_POC','VISUAL_DUMP_EXIT','VISUAL_OUTPUT_DIR','INTER_LAB_TRACE','INTER_LAB_CTU_X','INTER_LAB_CTU_Y'))+' '+shlex.join(args)
     provenance=dict(command=command,input=str(INPUT.relative_to(ROOT)),inputSha256=hashlib.sha256(INPUT.read_bytes()).hexdigest(),
-        encoderSha256=hashlib.sha256(encoder.read_bytes()).hexdigest(),configFile=profile,configText=cfg.read_text(),bitDepth=10,roi=dict(x=config['ctuX']*64,y=config['ctuY']*64,size=64))
+        encoderSha256=hashlib.sha256(encoder.read_bytes()).hexdigest(),configFile=profile,configText=cfg.read_text(encoding='utf-8'),bitDepth=10,roi=dict(x=config['ctuX']*64,y=config['ctuY']*64,size=64))
     bundle=dict(summary=summary,provenance=provenance,frames=frames,events=events)
     atomic_json(public/'result.json',bundle)
     for name in ('encoder.log','decisions.jsonl','stream.265'):
         (public/name).write_bytes((out/name).read_bytes())
-    (public/'command.txt').write_text(command+'\n')
-    (public/'encoder.cfg').write_text(cfg.read_text()+'\n# Overrides: '+json.dumps(config)+'\n')
+    (public/'command.txt').write_text(command+'\n', encoding='utf-8')
+    (public/'encoder.cfg').write_text(cfg.read_text(encoding='utf-8')+'\n# Overrides: '+json.dumps(config)+'\n', encoding='utf-8')
     items=[r for r in manifest() if r['id']!=run_id]+[summary]
     atomic_json(PUBLIC/'manifest.json',items)
     return summary

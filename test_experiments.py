@@ -16,7 +16,7 @@ class ExperimentChecks(unittest.TestCase):
         self.assertGreaterEqual(len(paths),8)
         for path in paths:
             with self.subTest(run=path.parent.name):
-                d=json.loads(path.read_text());s=d['summary'];c=s['config']
+                d=json.loads(path.read_text(encoding='utf-8'));s=d['summary'];c=s['config']
                 self.assertEqual(len(d['frames']),5)
                 self.assertEqual(s['bytes'],(path.parent/'stream.265').stat().st_size)
                 self.assertAlmostEqual(s['bitrateKbps'],s['bytes']*8/(5/8)/1000)
