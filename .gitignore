@@ -1,0 +1,35 @@
+# Python / local environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Native build outputs
+/build/
+/hm/build/
+/hm/bin/
+/hm/lib/
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+
+# Generated experiments (the eight named demo presets are versioned)
+/data/runs/
+/data/recon*.yuv
+/data/encoder.log
+/web/runs/run-*/
+/web/runs/*.tmp
+
+# Credentials / editor state
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.DS_Store
+.idea/
+.vscode/
+*~
