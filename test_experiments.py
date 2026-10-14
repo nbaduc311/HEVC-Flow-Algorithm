@@ -41,6 +41,37 @@ class ExperimentChecks(unittest.TestCase):
                     if e['phase']=='MERGE' and e['pass']==1:
                         self.assertTrue(e['skip']);self.assertEqual(e['cbf'],0)
 
+    def test_rd_origin_arithmetic(self):
+        checked_samples=set()
+        for path in (ROOT/'web/runs').glob('*/result.json'):
+            d=json.loads(path.read_text(encoding='utf-8'))
+            for e in d['events']:
+                if not e.get('originVersion'): continue
+                if e['phase']=='SPLIT':
+                    self.assertEqual(e['distortion'],sum(c['distortion'] for c in e['splitChildren']))
+                    self.assertGreaterEqual(e['bits'],sum(c['bits'] for c in e['splitChildren']))
+                    continue
+                self.assertEqual(e['bits'],sum(s['delta'] for s in e['rateSteps']))
+                self.assertEqual(e['rateSteps'][-1]['after'],e['bits'])
+                origin=e['distortionOrigin']
+                self.assertTrue(origin['matches'])
+                self.assertEqual(e['distortion'],sum(c['weighted'] for c in origin['components']))
+                for c in origin['components']:
+                    self.assertEqual(c['sse'],sum(g['sse'] for g in c['groups']))
+                    self.assertEqual(c['weighted'],sum(int(g['sse']*c['weight']) for g in c['groups']))
+                    self.assertEqual(c['width']*c['height'],sum(g['width']*g['height'] for g in c['groups']))
+                # Verify raw buffers for the first recorded candidate at each size/mode/run.
+                sample_key=(path.parent.name,e['phase'],e['size'])
+                if sample_key in checked_samples: continue
+                checked_samples.add(sample_key)
+                sample=json.loads((ROOT/'web'/e['samplesPath']).read_text(encoding='utf-8')) if 'samplesPath' in e else origin
+                for c,meta in zip(sample['components'],origin['components']):
+                    self.assertEqual(sum((a-b)**2 for a,b in zip(c['original'],c['reconstruction'])),meta['sse'])
+                    for g in meta['groups']:
+                        vals=[(c['original'][y*c['width']+x]-c['reconstruction'][y*c['width']+x])**2 for y in range(g['y'],g['y']+g['height']) for x in range(g['x'],g['x']+g['width'])]
+                        self.assertEqual(sum(vals),g['sse'])
+        self.assertTrue(checked_samples)
+
     def test_observation_preserves_baseline(self):
         # Same input/config as the demo captured before adding the new RD hooks.
         self.assertEqual((ROOT/'data/sample.265').read_bytes(),(ROOT/'web/runs/baseline/stream.265').read_bytes())

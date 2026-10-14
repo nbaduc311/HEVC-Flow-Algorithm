@@ -22,7 +22,7 @@ def find_encoder():
 INPUT = ROOT / 'data/sample_576x324_10bit.yuv'
 PUBLIC = ROOT / 'web/runs'
 RAW = ROOT / 'data/runs'
-DEFAULTS = dict(qp=32, searchRange=64, mergeCandidates=5, esd=0, fdm=1, cfm=0, ecu=0, amp=1, profile='P', ctuX=4, ctuY=2)
+DEFAULTS = dict(qp=32, searchRange=64, mergeCandidates=5, esd=0, fdm=1, cfm=0, ecu=0, amp=1, profile='P', ctuX=4, ctuY=1)
 PRESETS = [
     ('baseline', 'Mốc · QP 32', {}),
     ('qp22', 'QP 22 · tăng chất lượng', dict(qp=22)),
@@ -57,7 +57,7 @@ def manifest():
     path=PUBLIC/'manifest.json'
     return json.loads(path.read_text(encoding='utf-8')) if path.exists() else []
 
-def run_experiment(config, run_id=None, label=None):
+def run_experiment(config, run_id=None, label=None, publish=True):
     config=validate(config)
     encoder=find_encoder()
     if not INPUT.is_file():
@@ -98,7 +98,25 @@ def run_experiment(config, run_id=None, label=None):
     if not decisions.exists(): raise RuntimeError('Encoder chưa có trace RD. Hãy build lại HM.')
     events=[json.loads(line) for line in decisions.open(encoding='utf-8')]
     if not events: raise RuntimeError('Không có trace trong CTU đã chọn.')
-    for i,e in enumerate(events): e['seq']=i+1
+    for i,e in enumerate(events):
+        e['seq']=i+1
+        origin=e.get('distortionOrigin')
+        if origin:
+            if not origin['matches']:
+                raise RuntimeError(f"D provenance mismatch: event {i+1}, D={e['distortion']}, sum={origin['sum']}")
+            planes=[]
+            for component in origin['components']:
+                planes.append({k:component[k] for k in ('component','width','height','original','reconstruction')})
+                del component['original'];del component['reconstruction']
+            path=public/'details'/f'{i+1}.json'
+            atomic_json(path,dict(components=planes))
+            e['samplesPath']=f'runs/{run_id}/details/{i+1}.json'
+        if e.get('originVersion') and e['event']=='TRIAL':
+            if e['phase']=='SPLIT':
+                if sum(child['distortion'] for child in e['splitChildren'])!=e['distortion']:
+                    raise RuntimeError(f'Split D provenance mismatch: event {i+1}')
+            elif not e['rateSteps'] or e['rateSteps'][-1]['after']!=e['bits']:
+                raise RuntimeError(f'Rate provenance mismatch: event {i+1}')
     for f in frames:
         if len(f['ctus'])!=54: raise RuntimeError('Thiếu CTU trong trace')
         leaves=[n for c in f['ctus'] for n in c['nodes'] if not n['split']]
@@ -125,7 +143,7 @@ def run_experiment(config, run_id=None, label=None):
     (public/'command.txt').write_text(command+'\n', encoding='utf-8')
     (public/'encoder.cfg').write_text(cfg.read_text(encoding='utf-8')+'\n# Overrides: '+json.dumps(config)+'\n', encoding='utf-8')
     items=[r for r in manifest() if r['id']!=run_id]+[summary]
-    atomic_json(PUBLIC/'manifest.json',items)
+    if publish: atomic_json(PUBLIC/'manifest.json',items)
     return summary
 
 if __name__=='__main__':
@@ -133,5 +151,7 @@ if __name__=='__main__':
     args=parser.parse_args()
     if args.presets:
         for key,label,overrides in PRESETS:
-            print(json.dumps(run_experiment(DEFAULTS|overrides,key,label),ensure_ascii=False),flush=True)
+            config=DEFAULTS|overrides
+            run_id=f"{key}-ctu{config['ctuX']}-{config['ctuY']}"
+            print(json.dumps(run_experiment(config,run_id,label),ensure_ascii=False),flush=True)
     else: print(json.dumps(run_experiment(json.loads(args.config)),ensure_ascii=False))

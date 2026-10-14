@@ -1,6 +1,6 @@
 # HEVC Flow Algorithm — Intra / Inter Lab
 
-Lab tương tác bằng tiếng Việt để quan sát thuật toán mã hóa HEVC trên **HM 18.0**: luồng thử CU, quyết định RD, motion, ma trận pixel 10-bit và đối chiếu trực tiếp mã C++. Có **8 cấu hình demo đã chạy sẵn** và có thể chạy encoder thật trên máy của bạn.
+Lab tương tác bằng tiếng Việt để quan sát thuật toán mã hóa HEVC trên **HM 18.0**: luồng thử CU, quyết định RD, motion, ma trận pixel 10-bit và đối chiếu trực tiếp mã C++. Có **8 cấu hình demo tại CTU (4,1)** cùng 8 bản tại CTU (4,2) và có thể chạy encoder thật trên máy của bạn.
 
 ## Tải về và xem ngay
 
@@ -35,6 +35,8 @@ Trên macOS có thể cài Python, CMake và FFmpeg bằng Homebrew (`brew insta
 
 Nếu báo thiếu encoder, chạy `./build.sh`. Nếu thiếu FFmpeg, cài `ffmpeg`. Nếu cổng 5174 đang được dùng, dừng phiên Lab cũ rồi chạy lại.
 
+CTU quan sát mặc định hiện tại là **(4,1)**, tức vùng luma **(256,64), kích thước 64×64**. Tám cấu hình mẫu hiện tại có ID kết thúc bằng `-ctu4-1`; danh sách chọn lần chạy ghi rõ tọa độ CTU. Các lần chạy ở (4,2) vẫn được giữ để đọc lại ví dụ cũ.
+
 ## Sáu vùng làm việc
 
 1. **Chạy cấu hình:** chỉnh QP, Low Delay P/B, SearchRange, MaxNumMergeCand, ESD/FDM/CFM/ECU/AMP và CTU ghi trace. Nút “Chạy HM thật” gọi encoder cục bộ, lưu thành lần chạy mới, không ghi đè dữ liệu demo.
@@ -44,14 +46,37 @@ Nếu báo thiếu encoder, chạy `./build.sh`. Nếu thiếu FFmpeg, cài `ffm
 5. **Bản đồ CU/PU:** cập nhật theo lần chạy đang chọn; xem mode cuối, ranh giới nhiều PU, QP, MV/MVD và tham chiếu. Chọn CU trong ROI rồi mở “Luồng thử CU” để xem chi tiết. Với CU ngoài ROI, cấu hình lại CTU X/Y và chạy mới.
 6. **Code & bằng chứng:** command đầy đủ, cấu hình gốc, override, encoder log, bitstream, trace JSONL, input/encoder SHA-256 và các file C++ liên quan. Có bảng tính QP hiệu dụng và λ từ cấu hình hiện tại.
 
+## Truy nguồn D, R và lambda trong mỗi phép RD
+
+Trong **Luồng thử CU**, chọn một hàng rồi mở **Nguồn D · R · λ** (hoặc nút dưới công thức J).
+
+- **D:** phân rã Y/Cb/Cr, số mẫu, SSE chưa nhân trọng số, trọng số chroma và các nhóm cộng. Với Intra, cây TU đã chọn xác định từng hình chữ nhật; mỗi TU cắt phần thập phân sau nhân trọng số rồi mới cộng. Với Inter, tính trên toàn thành phần sau khi tái tạo và clip. Breakdown được đối chiếu từ buffer Original/Reconstruction 10-bit của ứng viên và trọng số thật; chương trình yêu cầu tổng khớp `getTotalDistortion()` trước khi xuất kết quả. Có thể mở từng hàng pixel để kiểm `(O−Rec)²` và tổng SSE. Với Split, D là tổng D của các CU con được sao chép bằng `copyPartFrom`.
+- **R:** snapshot bộ đếm sau từng nhóm cú pháp trong lần encode thử cuối của ứng viên. Bảng ghi giá trị nguyên tích lũy, mức tăng và `m_fracBits` theo đơn vị 1/32768 bit. Reset giữ phần lẻ CABAC. Mức tăng 0 bit không luôn có nghĩa cú pháp không được phát; cần nhìn cả cột phần lẻ. `encodeCoeff` gồm cấu trúc TU, CBF, hệ số và QP khi áp dụng. Với Split, bảng tách số bit con và phần báo hiệu bổ sung. Bảng chưa ghi mọi bin/context riêng lẻ.
+- **Lambda:** số thật từ `getLambda()` được đối chiếu với công thức `0.57 × 2^((QPframe + 6×(bitDepth−8) − 12)/3)` của các preset hiện tại. Có bảng đi từ QP cơ sở, offset GOP và mô hình offset đến QP frame. Không áp công thức rút gọn nếu nó không khớp trace.
+
+Ví dụ lịch sử **Mốc QP 32 tại CTU (4,2), POC 0, CU 64×64 tại (256,128), Intra 2Nx2N**:
+
+```text
+D_Y  = 647851
+D_Cb = 159443  (SSE 126554, trọng số 1.2599210498948732, cộng sau cắt theo 10 TU)
+D_Cr = 175849  (SSE 139576, cùng trọng số, 10 TU)
+D    = 983143
+R    = 2 + 2048 = 2050
+       bộ đếm cuối m_fracBits = 67198310; floor(67198310 / 32768) = 2050
+QP frame = 31; lambda = 0.57 × 2^(31/3) = 735.3907184026398
+J    = 983143 + lambda × 2050 = 2490693.972725412
+```
+
+`details/<seq>.json` lưu toàn bộ Original/Reconstruction Y/Cb/Cr, tải khi mở nguồn số liệu để tránh nạp mọi buffer cùng lúc. `enrich_rd_origins.py` có thể bổ sung nguồn cho lần chạy cũ bằng replay. Chỉ gắn thêm các trường sau khi xác minh input/output, cây CU và mọi trường quyết định cũ khớp; log, thời gian và SHA encoder cũ được giữ nguyên. `provenance.rdOriginReplay` xác định encoder/lần chạy bổ sung; tab Code & bằng chứng có link trace bổ sung riêng.
+
 ## Bài trình bày gợi ý
 
 Trong **Luồng thử CU**, ảnh nhỏ ở cột trái là toàn CTU 64×64; viền vàng chỉ vị trí CU. Hai hình phóng to bên phải cùng lấy đúng vùng CU: một hình vẽ phân hoạch của lượt thử đang chọn, một hình vẽ phân hoạch cuối giống Bản đồ CU/PU. Ảnh nền gốc/tái tạo được đồng bộ giữa hai vùng; nền này không phải reconstruction riêng của từng ứng viên. Nút “Xem trên bản đồ ↗” mở bản đồ trong tab mới, giữ lần chạy, POC, vị trí CU, lượt thử và nguồn ảnh qua URL. Tab luồng thử hiện tại vẫn giữ nguyên lựa chọn. Nếu CU thử không còn trong cây cuối, trang ghi rõ CU cuối chứa vị trí đó.
 
-Ví dụ mốc QP 32, POC 0, CU 8×8 tại (256,128): HM thử Intra 2Nx2N (1 PU 8×8, J=141771.1512), rồi Intra NxN (4 PU 4×4, J=111998.5883). Phương án NxN có chi phí thấp hơn và xuất hiện trên bản đồ cuối. Nút “Đến lượt cùng phân hoạch với kết quả cuối” giúp đối chiếu hai màn hình.
+Ví dụ lịch sử mốc QP 32 tại CTU (4,2), POC 0, CU 8×8 tại (256,128): HM thử Intra 2Nx2N (1 PU 8×8, J=141771.1512), rồi Intra NxN (4 PU 4×4, J=111998.5883). Phương án NxN có chi phí thấp hơn và xuất hiện trên bản đồ cuối. Nút “Đến lượt cùng phân hoạch với kết quả cuối” giúp đối chiếu hai màn hình.
 
 - Giữ A = **Mốc QP 32**, chọn B = **QP 22** rồi **QP 42**. Giải thích QP cơ sở khác QP frame; quan sát bit, PSNR và λ.
-- Mở cùng CU 32×32 tại (256,128), POC 1. Chọn cùng ứng viên trong hai lần chạy, phân rã ΔJ; sau đó mở “Luồng thử CU” và “Pixel 10-bit”.
+- Mở cùng CU 32×32 tại (256,64), POC 1 trong hai lần chạy tại CTU (4,1). Chọn cùng ứng viên trong hai lần chạy, phân rã ΔJ; sau đó mở “Luồng thử CU” và “Pixel 10-bit”.
 - So mốc với **Bật Early Skip**: thứ tự Inter/Merge đổi, số lượt thử giảm.
 - So mốc với **Tắt Fast Merge**: nhiều lượt RD hơn nhưng bộ mẫu này vẫn cho cùng bitstream. Thử nhiều hơn không đảm bảo thay đổi kết quả.
 - So **1 merge candidate** hoặc **SearchRange 8** để liên hệ lựa chọn motion và kết quả toàn frame.
@@ -66,11 +91,11 @@ Input năm frame và toàn bộ dữ liệu cần để xem demo đã có trong 
 # Build HM đã thêm hook trace
 ./build.sh
 
-# Chạy lại 8 cấu hình mẫu (ghi đè đúng 8 ID preset)
+# Chạy lại 8 cấu hình mẫu hiện tại (ID kết thúc bằng -ctu4-1)
 python3 experiments.py --presets
 
 # Tạo lần chạy mới từ dòng lệnh
-python3 experiments.py --config '{"qp":28,"esd":1,"ctuX":4,"ctuY":2}'
+python3 experiments.py --config '{"qp":28,"esd":1,"ctuX":4,"ctuY":1}'
 
 # Tạo lại toàn bộ demo từ input YUV đi kèm, gồm ảnh và bundle
 ./rebuild_demo.sh
@@ -79,15 +104,16 @@ python3 experiments.py --config '{"qp":28,"esd":1,"ctuX":4,"ctuY":2}'
 python3 test_experiments.py
 ```
 
-`run.sh` chỉ khởi động server, không tự build hoặc chạy lại preset. Các lệnh `--presets` và `rebuild_demo.sh` sẽ thay thế kết quả của tám preset; các lần chạy có ID `run-...` được giữ lại.
+`run.sh` chỉ khởi động server, không tự build hoặc chạy lại preset. Các lệnh `--presets` và `rebuild_demo.sh` sẽ thay thế kết quả của tám preset tại CTU (4,1); tám bản lịch sử tại CTU (4,2) và các lần chạy có ID `run-...` được giữ lại.
 
 ## Cấu trúc repo
 
 ```text
 server.py, experiments.py   Server cục bộ và bộ chạy thí nghiệm
+enrich_rd_origins.py        Replay để bổ sung nguồn D/R cho dữ liệu cũ
 build.sh, run.sh            Build encoder và mở Lab
 rebuild_demo.sh             Tạo lại demo từ input đi kèm
-web/                       Giao diện, ảnh và 8 bộ kết quả mẫu
+web/                       Giao diện, ảnh, 16 bộ kết quả và dữ liệu D/R chi tiết
 hm/source/                 HM 18.0 với hook ghi trace
 hm/cfg/                    Các cấu hình encoder
 hm/COPYING                 Giấy phép và bản quyền HM
@@ -114,7 +140,7 @@ Input là 576×324 YUV420 10-bit, 5 frame. HM dùng 8 fps làm tốc độ quy �
 - **WebP:** ảnh gốc và tái tạo được chuyển xuống để hiển thị. Predictor ở vùng Bản đồ dựng gần đúng từ WebP. Nếu bi-pred, bản đồ chỉ minh họa nhánh L0; vùng Motion PU ghi cả L0/L1 và vùng Pixel có predictor HM thật.
 - **Cùng merge index giữa hai lần chạy:** không bảo đảm cùng MV, nguồn candidate hoặc reference. So sánh ΔJ là phân rã số học, không tự chứng minh quan hệ nhân quả cho riêng một tham số.
 - **Thời gian:** một lần đo, có trace và chịu ảnh hưởng tải máy. Không dùng như benchmark ổn định.
-- **Chưa ghi:** mọi điểm tìm kiếm ME, toàn bộ AMVP candidates, nguồn không gian/thời gian của từng merge candidate, từng TU và hệ số DCT/quant. Giao diện không tạo số giả cho các bước đó.
+- **Chưa ghi:** mọi điểm tìm kiếm ME, toàn bộ AMVP candidates, nguồn không gian/thời gian của từng merge candidate, mọi lượt thử transform/quant và từng hệ số DCT/quant (đã ghi hình học TU được chọn để kiểm D). Giao diện không tạo số giả cho các bước đó.
 
 `data/runs/<id>/` lưu YUV và trace thô. `web/runs/<id>/` lưu bundle, ảnh, log, command, cfg và bitstream để xem/tải. Hai file Python `experiments.py` và `server.py` tổ chức chạy encoder và cung cấp API. Server chỉ chạy một encode tại một thời điểm, kiểm tra miền tham số và gọi subprocess bằng danh sách đối số.
 

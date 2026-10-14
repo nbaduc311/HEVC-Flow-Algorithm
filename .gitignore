@@ -16,7 +16,7 @@ venv/
 *.dylib
 *.exe
 
-# Generated experiments (the eight named demo presets are versioned)
+# Generated experiments (the named demo presets are versioned)
 /data/runs/
 /data/recon*.yuv
 /data/encoder.log

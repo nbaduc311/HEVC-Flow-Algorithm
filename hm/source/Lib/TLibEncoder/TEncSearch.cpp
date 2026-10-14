@@ -4723,14 +4723,19 @@ Void TEncSearch::encodeResAndCalcRdInterCU( TComDataCU* pcCU, TComYuv* pcYuvOrg,
 
     m_pcRDGoOnSbacCoder->load(m_pppcRDSbacCoder[pcCU->getDepth(0)][CI_CURR_BEST]);
     m_pcEntropyCoder->resetBits();
+  VisualDumper::getInstance()->labRateBegin(pcCU);
+  VisualDumper::getInstance()->labRateStep(pcCU, "resetBits / carry", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
 
     if (pcCU->getSlice()->getPPS()->getTransquantBypassEnabledFlag())
     {
       m_pcEntropyCoder->encodeCUTransquantBypassFlag(pcCU, 0, true);
+  VisualDumper::getInstance()->labRateStep(pcCU, "encodeCUTransquantBypassFlag", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
     }
 
     m_pcEntropyCoder->encodeSkipFlag(pcCU, 0, true);
+  VisualDumper::getInstance()->labRateStep(pcCU, "encodeSkipFlag", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
     m_pcEntropyCoder->encodeMergeIndex( pcCU, 0, true );
+  VisualDumper::getInstance()->labRateStep(pcCU, "encodeMergeIndex", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
 
     UInt uiBits = m_pcEntropyCoder->getNumberOfWrittenBits();
     pcCU->getTotalBits()       = uiBits;
@@ -5707,32 +5712,45 @@ Void  TEncSearch::xAddSymbolBitsInter( TComDataCU* pcCU, UInt& ruiBits )
     pcCU->setSkipFlagSubParts( true, 0, pcCU->getDepth(0) );
 
     m_pcEntropyCoder->resetBits();
+  VisualDumper::getInstance()->labRateBegin(pcCU);
+  VisualDumper::getInstance()->labRateStep(pcCU, "resetBits / carry", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
     if(pcCU->getSlice()->getPPS()->getTransquantBypassEnabledFlag())
     {
       m_pcEntropyCoder->encodeCUTransquantBypassFlag(pcCU, 0, true);
+  VisualDumper::getInstance()->labRateStep(pcCU, "encodeCUTransquantBypassFlag", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
     }
     m_pcEntropyCoder->encodeSkipFlag(pcCU, 0, true);
+  VisualDumper::getInstance()->labRateStep(pcCU, "encodeSkipFlag", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
     m_pcEntropyCoder->encodeMergeIndex(pcCU, 0, true);
+  VisualDumper::getInstance()->labRateStep(pcCU, "encodeMergeIndex", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
 
     ruiBits += m_pcEntropyCoder->getNumberOfWrittenBits();
   }
   else
   {
     m_pcEntropyCoder->resetBits();
+  VisualDumper::getInstance()->labRateBegin(pcCU);
+  VisualDumper::getInstance()->labRateStep(pcCU, "resetBits / carry", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
 
     if(pcCU->getSlice()->getPPS()->getTransquantBypassEnabledFlag())
     {
       m_pcEntropyCoder->encodeCUTransquantBypassFlag(pcCU, 0, true);
+  VisualDumper::getInstance()->labRateStep(pcCU, "encodeCUTransquantBypassFlag", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
     }
 
     m_pcEntropyCoder->encodeSkipFlag ( pcCU, 0, true );
+  VisualDumper::getInstance()->labRateStep(pcCU, "encodeSkipFlag", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
     m_pcEntropyCoder->encodePredMode( pcCU, 0, true );
+  VisualDumper::getInstance()->labRateStep(pcCU, "encodePredMode", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
     m_pcEntropyCoder->encodePartSize( pcCU, 0, pcCU->getDepth(0), true );
+  VisualDumper::getInstance()->labRateStep(pcCU, "encodePartSize", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
     m_pcEntropyCoder->encodePredInfo( pcCU, 0 );
+  VisualDumper::getInstance()->labRateStep(pcCU, "encodePredInfo", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
 
     Bool codeDeltaQp = false;
     Bool codeChromaQpAdj = false;
     m_pcEntropyCoder->encodeCoeff   ( pcCU, 0, pcCU->getDepth(0), codeDeltaQp, codeChromaQpAdj );
+  VisualDumper::getInstance()->labRateStep(pcCU, "encodeCoeff", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
 
     ruiBits += m_pcEntropyCoder->getNumberOfWrittenBits();
   }

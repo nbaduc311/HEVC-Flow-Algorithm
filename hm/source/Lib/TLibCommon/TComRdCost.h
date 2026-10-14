@@ -133,6 +133,7 @@ public:
 
   Double calcRdCost( Double numBits, Distortion distortion, DFunc eDFunc = DF_DEFAULT );
 
+  Double getLabDistortionWeight(const ComponentID compID) const { return compID == COMPONENT_Y ? 1.0 : m_distortionWeight[compID]; }
   Void    setDistortionWeight  ( const ComponentID compID, const Double distortionWeight ) { m_distortionWeight[compID] = distortionWeight; }
   Void    setLambda      ( Double dLambda, const BitDepths &bitDepths );
   Void    setFrameLambda ( Double dLambda ) { m_dFrameLambda = dLambda; }

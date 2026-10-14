@@ -9,6 +9,8 @@
 #include <iomanip>
 #include <cmath>
 #include "TComYuv.h"
+#include "TComTU.h"
+#include "TComRdCost.h"
 
 VisualDumper* VisualDumper::s_instance = NULL;
 
@@ -559,7 +561,7 @@ Bool VisualDumper::labActive(TComDataCU* cu) {
     if (!m_enabled || !getenv("INTER_LAB_TRACE")) return false;
     const char* ex = getenv("INTER_LAB_CTU_X");
     const char* ey = getenv("INTER_LAB_CTU_Y");
-    Int x = ex ? atoi(ex) : 4, y = ey ? atoi(ey) : 2;
+    Int x = ex ? atoi(ex) : 4, y = ey ? atoi(ey) : 1;
     if (Int(cu->getCUPelX()/64) != x || Int(cu->getCUPelY()/64) != y) return false;
     if (!m_labFile.is_open()) m_labFile.open((m_outputDir+"decisions.jsonl").c_str());
     return m_labFile.is_open();
@@ -574,9 +576,65 @@ Void VisualDumper::dumpMergePruned(TComDataCU* cu, Int candidate, Int pass, cons
     m_labFile.flush();
 }
 
-Void VisualDumper::dumpModeTrial(TComDataCU* cu, TComDataCU* best, UInt depth, Double lambda,
+
+static Void labTuRects(TComTU& tu, std::vector<TComRectangle> rects[MAX_NUM_COMPONENT]) {
+    if (tu.GetTransformDepthRel() == tu.getCU()->getTransformIdx(tu.GetAbsPartIdxTU())) {
+        for (Int c=0;c<3;++c) if(tu.ProcessComponentSection(ComponentID(c))) rects[c].push_back(tu.getRect(ComponentID(c)));
+    } else {
+        TComTURecurse child(tu,false);
+        do { labTuRects(child,rects); } while(child.nextSection(tu));
+    }
+}
+
+static Void labDistortionOrigin(std::stringstream& ss, TComDataCU* cu, TComYuv* org, TComYuv* reco, TComRdCost* rd, Bool intra) {
+    std::vector<TComRectangle> rects[MAX_NUM_COMPONENT];
+    if(intra){ TComTURecurse tu(cu,0); labTuRects(tu,rects); }
+    ss << ",\"distortionOrigin\":{\"method\":\"" << (intra?"per_TU":"whole_component") << "\",\"components\":[";
+    UInt64 total=0;
+    for(Int c=0;c<3;++c){
+        const ComponentID id=ComponentID(c);UInt w=org->getWidth(id),h=org->getHeight(id);
+        if(!intra){ TComRectangle r; r.x0=0;r.y0=0;r.width=w;r.height=h;rects[c].push_back(r); }
+        const Pel* a=org->getAddr(id);const Pel* b=reco->getAddr(id);
+        const UInt as=org->getStride(id),bs=reco->getStride(id);
+        const Double weight=rd->getLabDistortionWeight(id);
+        if(c)ss<<",";
+        ss<<"{\"component\":\""<<(c==0?"Y":c==1?"Cb":"Cr")<<"\",\"width\":"<<w<<",\"height\":"<<h<<",\"weight\":"<<weight<<",\"groups\":[";
+        UInt64 rawTotal=0,weightedTotal=0;
+        for(UInt k=0;k<rects[c].size();++k){const TComRectangle& r=rects[c][k];UInt64 raw=0;
+            for(UInt y=r.y0;y<r.y0+r.height;++y)for(UInt x=r.x0;x<r.x0+r.width;++x){Int64 d=Int64(a[y*as+x])-b[y*bs+x];raw+=d*d;}
+            const UInt64 weighted=UInt64(weight*raw);rawTotal+=raw;weightedTotal+=weighted;
+            if(k){ss<<",";}
+            ss<<"{\"x\":"<<r.x0<<",\"y\":"<<r.y0<<",\"width\":"<<r.width<<",\"height\":"<<r.height<<",\"sse\":"<<raw<<",\"weighted\":"<<weighted<<"}";
+        }
+        total+=weightedTotal;
+        ss<<"],\"sse\":"<<rawTotal<<",\"weighted\":"<<weightedTotal;
+        const Pel* planes[]={a,b};UInt strides[]={as,bs};const char* names[]={"original","reconstruction"};
+        for(Int p=0;p<2;++p){ss<<",\""<<names[p]<<"\":[";for(UInt y=0;y<h;++y)for(UInt x=0;x<w;++x){if(x||y)ss<<",";ss<<planes[p][y*strides[p]+x];}ss<<"]";}
+        ss<<"}";
+    }
+    ss<<"],\"sum\":"<<total<<",\"matches\":"<<(total==cu->getTotalDistortion()?"true":"false")<<"}";
+}
+
+Void VisualDumper::labRateBegin(TComDataCU* cu){if(!labActive(cu))return;m_labRate.clear();m_labLastBits=0;}
+Void VisualDumper::labRateStep(TComDataCU* cu,const char* label,UInt bits,Int64 fracBits){
+    if(!labActive(cu)){return;}
+    std::stringstream ss;
+    ss<<"{\"label\":\""<<label<<"\",\"after\":"<<bits<<",\"delta\":"<<(Int64(bits)-m_labLastBits);
+    if(fracBits>=0)ss<<",\"fracBits15\":"<<fracBits;
+    ss<<"}";
+    m_labRate.push_back(ss.str());m_labLastBits=bits;
+}
+Void VisualDumper::labSplitChild(TComDataCU* parent,TComDataCU* child,UInt depth,UInt index){
+    if(!labActive(parent)){return;}
+    if(index==0)m_labChildren[depth].clear();
+    std::stringstream ss;ss<<"{\"index\":"<<index<<",\"x\":"<<child->getCUPelX()<<",\"y\":"<<child->getCUPelY()<<",\"bits\":"<<child->getTotalBits()<<",\"distortion\":"<<child->getTotalDistortion()<<"}";
+    m_labChildren[depth].push_back(ss.str());
+}
+
+Void VisualDumper::dumpModeTrial(TComDataCU* cu, TComDataCU* best, UInt depth, TComRdCost* rd,
                                 const char* phase, Int noResidual, TComYuv* org, TComYuv* pred, TComYuv* reco) {
     if (!labActive(cu) || !std::isfinite(cu->getTotalCost()) || cu->getTotalCost() >= MAX_DOUBLE/2) return;
+    const Double lambda = rd->getLambda();
     std::stringstream ss;
     ss << std::setprecision(17);
     ss << "{\"event\":\"TRIAL\",\"poc\":" << cu->getSlice()->getPOC()
@@ -591,6 +649,16 @@ Void VisualDumper::dumpModeTrial(TComDataCU* cu, TComDataCU* best, UInt depth, D
     ss << ",\"accepted\":" << (cu->getTotalCost()<best->getTotalCost()?"true":"false")
        << ",\"cbf\":" << Int(cu->getQtRootCbf(0)) << ",\"skip\":" << (cu->getSkipFlag(0)?"true":"false")
        << ",\"pass\":" << noResidual << ",\"candidate\":" << (noResidual>=0 ? Int(cu->getMergeIndex(0)) : -1);
+
+    ss << ",\"originVersion\":1,\"rateSteps\":[";
+    if(std::string(phase)!="SPLIT")for(UInt i=0;i<m_labRate.size();++i){if(i)ss<<",";ss<<m_labRate[i];}
+    ss << "]";
+    if(std::string(phase)=="SPLIT"){
+        ss<<",\"splitChildren\":[";const std::vector<std::string>& children=m_labChildren[depth];
+        for(UInt i=0;i<children.size();++i){if(i)ss<<",";ss<<children[i];}ss<<"]";
+    }
+    if(org&&reco)labDistortionOrigin(ss,cu,org,reco,rd,std::string(phase)=="INTRA");
+
     if (std::string(phase)=="INTER" || std::string(phase)=="MERGE") {
         ss << ",\"pus\":[";
         UInt offset=0;

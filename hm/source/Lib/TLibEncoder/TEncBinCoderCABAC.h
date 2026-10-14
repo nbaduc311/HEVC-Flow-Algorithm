@@ -47,6 +47,13 @@
 class TEncBinCABAC : public TEncBinIf
 {
 public:
+  UInt64 getLabFracBits() const {
+#if FAST_BIT_EST
+    return m_fracBits;
+#else
+    return 0;
+#endif
+  }
   TEncBinCABAC ();
   virtual ~TEncBinCABAC();
 

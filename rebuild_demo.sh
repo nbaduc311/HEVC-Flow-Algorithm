@@ -12,13 +12,13 @@ fi
 
 # The bundled five-frame input makes the lab independent of the original video.
 python3 experiments.py --presets
-cp data/runs/baseline/trace.jsonl data/trace.jsonl
-cp data/runs/baseline/stream.265 data/sample.265
+cp data/runs/baseline-ctu4-1/trace.jsonl data/trace.jsonl
+cp data/runs/baseline-ctu4-1/stream.265 data/sample.265
 for name in orig recon; do
   if [[ "$name" == orig ]]; then
     raw=data/sample_576x324_10bit.yuv
   else
-    raw=data/runs/baseline/recon.yuv
+    raw=data/runs/baseline-ctu4-1/recon.yuv
   fi
   ffmpeg -hide_banner -loglevel error -y -f rawvideo -pixel_format yuv420p10le \
     -video_size 576x324 -framerate 8 -i "$raw" -frames:v 5 \

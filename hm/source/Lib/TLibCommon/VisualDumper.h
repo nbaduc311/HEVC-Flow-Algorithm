@@ -5,9 +5,12 @@
 #include <string>
 #include <fstream>
 #include <iostream>
+#include <vector>
+#include <map>
 
 class TComDataCU;
 class TComYuv;
+class TComRdCost;
 
 #define ENABLE_VISUAL_DUMP 1
 
@@ -18,6 +21,10 @@ private:
     std::ofstream m_outFile;
     std::ofstream m_labFile;
     Bool labActive(TComDataCU* cu);
+    std::vector<std::string> m_labRate;
+    std::map<UInt, std::vector<std::string> > m_labChildren;
+    UInt m_labLastBits;
+
     
     Bool m_enabled;
     Bool m_exitOnFinish;
@@ -81,8 +88,11 @@ public:
 
     Void dumpPartitionTree(TComDataCU* pcCU);
 
-    Void dumpModeTrial(TComDataCU* cu, TComDataCU* best, UInt depth, Double lambda,
+    Void dumpModeTrial(TComDataCU* cu, TComDataCU* best, UInt depth, TComRdCost* rd,
                        const char* phase, Int noResidual, TComYuv* org, TComYuv* pred, TComYuv* reco);
+    Void labRateBegin(TComDataCU* cu);
+    Void labRateStep(TComDataCU* cu, const char* label, UInt bits, Int64 fracBits = -1);
+    Void labSplitChild(TComDataCU* parent, TComDataCU* child, UInt depth, UInt index);
     Void dumpMergePruned(TComDataCU* cu, Int candidate, Int pass, const char* reason);
 
     Void dumpTransformQuant(Int poc, Int ctuX, Int ctuY, Int tuX, Int tuY, Int tuWidth, Int tuHeight,

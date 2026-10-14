@@ -1058,6 +1058,7 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, const 
           xCompressCU( pcSubBestPartCU, pcSubTempPartCU, uhNextDepth );
 #endif
 
+          VisualDumper::getInstance()->labSplitChild(rpcTempCU, pcSubBestPartCU, uiDepth, uiPartUnitIdx);
           rpcTempCU->copyPartFrom( pcSubBestPartCU, uiPartUnitIdx, uhNextDepth );         // Keep best part data to current temporary data.
           xCopyYuv2Tmp( pcSubBestPartCU->getTotalNumPart()*uiPartUnitIdx, uhNextDepth );
 #if JVET_Y0077_BIM
@@ -1076,6 +1077,7 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, const 
         else
         {
           pcSubBestPartCU->copyToPic( uhNextDepth );
+          VisualDumper::getInstance()->labSplitChild(rpcTempCU, pcSubBestPartCU, uiDepth, uiPartUnitIdx);
           rpcTempCU->copyPartFrom( pcSubBestPartCU, uiPartUnitIdx, uhNextDepth );
         }
       }
@@ -1176,7 +1178,7 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, const 
         }
       }
 
-      VisualDumper::getInstance()->dumpModeTrial(rpcTempCU, rpcBestCU, uiDepth, m_pcRdCost->getLambda(), "SPLIT", -1, NULL, NULL, NULL);
+      VisualDumper::getInstance()->dumpModeTrial(rpcTempCU, rpcBestCU, uiDepth, m_pcRdCost, "SPLIT", -1, NULL, NULL, NULL);
       xCheckBestMode( rpcBestCU, rpcTempCU, uiDepth DEBUG_STRING_PASS_INTO(sDebug) DEBUG_STRING_PASS_INTO(sTempDebug) DEBUG_STRING_PASS_INTO(false) ); // RD compare current larger prediction
                                                                                                                                                        // with sub partitioned prediction.
     }
@@ -1590,7 +1592,8 @@ Void TEncCu::xCheckRDCostMerge2Nx2N( TComDataCU*& rpcBestCU, TComDataCU*& rpcTem
 
           Int orgQP = rpcTempCU->getQP( 0 );
           xCheckDQP( rpcTempCU );
-          VisualDumper::getInstance()->dumpModeTrial(rpcTempCU, rpcBestCU, uhDepth, m_pcRdCost->getLambda(), "MERGE", uiNoResidual, m_ppcOrigYuv[uhDepth], m_ppcPredYuvTemp[uhDepth], m_ppcRecoYuvTemp[uhDepth]);
+  VisualDumper::getInstance()->labRateStep(rpcTempCU, "xCheckDQP / final total", rpcTempCU->getTotalBits());
+          VisualDumper::getInstance()->dumpModeTrial(rpcTempCU, rpcBestCU, uhDepth, m_pcRdCost, "MERGE", uiNoResidual, m_ppcOrigYuv[uhDepth], m_ppcPredYuvTemp[uhDepth], m_ppcRecoYuvTemp[uhDepth]);
           xCheckBestMode(rpcBestCU, rpcTempCU, uhDepth DEBUG_STRING_PASS_INTO(bestStr) DEBUG_STRING_PASS_INTO(tmpStr));
 
           rpcTempCU->initEstData( uhDepth, orgQP, bTransquantBypassFlag );
@@ -1695,7 +1698,8 @@ Void TEncCu::xCheckRDCostInter( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, 
 #endif
 
   xCheckDQP( rpcTempCU );
-  VisualDumper::getInstance()->dumpModeTrial(rpcTempCU, rpcBestCU, uhDepth, m_pcRdCost->getLambda(), "INTER", -1, m_ppcOrigYuv[uhDepth], m_ppcPredYuvTemp[uhDepth], m_ppcRecoYuvTemp[uhDepth]);
+  VisualDumper::getInstance()->labRateStep(rpcTempCU, "xCheckDQP / final total", rpcTempCU->getTotalBits());
+  VisualDumper::getInstance()->dumpModeTrial(rpcTempCU, rpcBestCU, uhDepth, m_pcRdCost, "INTER", -1, m_ppcOrigYuv[uhDepth], m_ppcPredYuvTemp[uhDepth], m_ppcRecoYuvTemp[uhDepth]);
   xCheckBestMode(rpcBestCU, rpcTempCU, uhDepth DEBUG_STRING_PASS_INTO(sDebug) DEBUG_STRING_PASS_INTO(sTest));
 }
 
@@ -1736,22 +1740,31 @@ Void TEncCu::xCheckRDCostIntra( TComDataCU *&rpcBestCU,
   }
 
   m_pcEntropyCoder->resetBits();
+  VisualDumper::getInstance()->labRateBegin(rpcTempCU);
+  VisualDumper::getInstance()->labRateStep(rpcTempCU, "resetBits / carry", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
 
   if ( rpcTempCU->getSlice()->getPPS()->getTransquantBypassEnabledFlag())
   {
     m_pcEntropyCoder->encodeCUTransquantBypassFlag( rpcTempCU, 0,          true );
+  VisualDumper::getInstance()->labRateStep(rpcTempCU, "encodeCUTransquantBypassFlag", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
   }
 
   m_pcEntropyCoder->encodeSkipFlag ( rpcTempCU, 0,          true );
+  VisualDumper::getInstance()->labRateStep(rpcTempCU, "encodeSkipFlag", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
   m_pcEntropyCoder->encodePredMode( rpcTempCU, 0,          true );
+  VisualDumper::getInstance()->labRateStep(rpcTempCU, "encodePredMode", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
   m_pcEntropyCoder->encodePartSize( rpcTempCU, 0, uiDepth, true );
+  VisualDumper::getInstance()->labRateStep(rpcTempCU, "encodePartSize", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
   m_pcEntropyCoder->encodePredInfo( rpcTempCU, 0 );
+  VisualDumper::getInstance()->labRateStep(rpcTempCU, "encodePredInfo", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
   m_pcEntropyCoder->encodeIPCMInfo(rpcTempCU, 0, true );
+  VisualDumper::getInstance()->labRateStep(rpcTempCU, "encodeIPCMInfo", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
 
   // Encode Coefficients
   Bool bCodeDQP = getdQPFlag();
   Bool codeChromaQpAdjFlag = getCodeChromaQpAdjFlag();
   m_pcEntropyCoder->encodeCoeff( rpcTempCU, 0, uiDepth, bCodeDQP, codeChromaQpAdjFlag );
+  VisualDumper::getInstance()->labRateStep(rpcTempCU, "encodeCoeff", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
   setCodeChromaQpAdjFlag( codeChromaQpAdjFlag );
   setdQPFlag( bCodeDQP );
 
@@ -1763,7 +1776,8 @@ Void TEncCu::xCheckRDCostIntra( TComDataCU *&rpcBestCU,
 
   xCheckDQP( rpcTempCU );
 
-  VisualDumper::getInstance()->dumpModeTrial(rpcTempCU, rpcBestCU, uiDepth, m_pcRdCost->getLambda(), "INTRA", -1, NULL, NULL, NULL);
+  VisualDumper::getInstance()->labRateStep(rpcTempCU, "xCheckDQP / final total", rpcTempCU->getTotalBits());
+  VisualDumper::getInstance()->dumpModeTrial(rpcTempCU, rpcBestCU, uiDepth, m_pcRdCost, "INTRA", -1, m_ppcOrigYuv[uiDepth], NULL, m_ppcRecoYuvTemp[uiDepth]);
   xCheckBestMode(rpcBestCU, rpcTempCU, uiDepth DEBUG_STRING_PASS_INTO(sDebug) DEBUG_STRING_PASS_INTO(sTest));
 }
 
@@ -1803,16 +1817,23 @@ Void TEncCu::xCheckIntraPCM( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU )
   m_pcRDGoOnSbacCoder->load(m_pppcRDSbacCoder[uiDepth][CI_CURR_BEST]);
 
   m_pcEntropyCoder->resetBits();
+  VisualDumper::getInstance()->labRateBegin(rpcTempCU);
+  VisualDumper::getInstance()->labRateStep(rpcTempCU, "resetBits / carry", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
 
   if ( rpcTempCU->getSlice()->getPPS()->getTransquantBypassEnabledFlag())
   {
     m_pcEntropyCoder->encodeCUTransquantBypassFlag( rpcTempCU, 0,          true );
+  VisualDumper::getInstance()->labRateStep(rpcTempCU, "encodeCUTransquantBypassFlag", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
   }
 
   m_pcEntropyCoder->encodeSkipFlag ( rpcTempCU, 0,          true );
+  VisualDumper::getInstance()->labRateStep(rpcTempCU, "encodeSkipFlag", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
   m_pcEntropyCoder->encodePredMode ( rpcTempCU, 0,          true );
+  VisualDumper::getInstance()->labRateStep(rpcTempCU, "encodePredMode", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
   m_pcEntropyCoder->encodePartSize ( rpcTempCU, 0, uiDepth, true );
+  VisualDumper::getInstance()->labRateStep(rpcTempCU, "encodePartSize", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
   m_pcEntropyCoder->encodeIPCMInfo ( rpcTempCU, 0, true );
+  VisualDumper::getInstance()->labRateStep(rpcTempCU, "encodeIPCMInfo", m_pcEntropyCoder->getNumberOfWrittenBits(), ((TEncBinCABAC*)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getLabFracBits());
 
   m_pcRDGoOnSbacCoder->store(m_pppcRDSbacCoder[uiDepth][CI_TEMP_BEST]);
 
@@ -1823,7 +1844,8 @@ Void TEncCu::xCheckIntraPCM( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU )
   xCheckDQP( rpcTempCU );
   DEBUG_STRING_NEW(a)
   DEBUG_STRING_NEW(b)
-  VisualDumper::getInstance()->dumpModeTrial(rpcTempCU, rpcBestCU, uiDepth, m_pcRdCost->getLambda(), "PCM", -1, NULL, NULL, NULL);
+  VisualDumper::getInstance()->labRateStep(rpcTempCU, "xCheckDQP / final total", rpcTempCU->getTotalBits());
+  VisualDumper::getInstance()->dumpModeTrial(rpcTempCU, rpcBestCU, uiDepth, m_pcRdCost, "PCM", -1, m_ppcOrigYuv[uiDepth], NULL, m_ppcRecoYuvTemp[uiDepth]);
   xCheckBestMode(rpcBestCU, rpcTempCU, uiDepth DEBUG_STRING_PASS_INTO(a) DEBUG_STRING_PASS_INTO(b));
 }
 
