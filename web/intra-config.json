@@ -1,0 +1,157 @@
+{
+  "options": [
+    {
+      "key": "fastIntraMpm",
+      "option": "FastUDIUseMPMEnabled",
+      "label": "Sàng lọc có bổ sung MPM",
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "type": "bool",
+      "help": "Bật: dùng bảng số mode rút gọn và bổ sung MPM chưa có. Tắt: dùng bảng số mode khác, không bổ sung MPM. Cả hai vẫn sàng lọc nhanh 35 mode; không phải bật/tắt tìm RD đủ 35 mode."
+    },
+    {
+      "key": "strongSmoothing",
+      "option": "StrongIntraSmoothing",
+      "label": "Strong intra smoothing",
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "type": "bool",
+      "help": "Cho phép làm mượt mạnh mẫu tham chiếu luma của khối 32×32 khi điều kiện phù hợp. Tắt không tắt bộ lọc tham chiếu thông thường; không phải CU nào cũng bị ảnh hưởng."
+    },
+    {
+      "key": "tuDepthIntra",
+      "option": "QuadtreeTUMaxDepthIntra",
+      "label": "Độ sâu tối đa cây TU Intra",
+      "default": 3,
+      "min": 1,
+      "max": 5,
+      "type": "int",
+      "help": "Giới hạn độ sâu tìm cây TU Intra theo quy tắc HM. Số lớn cho phép xét nhiều mức chia hơn; TU vẫn chịu giới hạn 4×4–32×32 và phân hoạch PU. Depth=1 không có nghĩa CU 64×64 dùng TU 64×64."
+    },
+    {
+      "key": "transformSkip",
+      "option": "TransformSkip",
+      "label": "Transform skip",
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "type": "bool",
+      "help": "Cho phép thử bỏ phép biến đổi cho TU đủ điều kiện (tối đa 4×4 trong Main10 hiện tại). Vẫn lượng tử và mã hóa residual. Đây không phải CU Skip của Inter."
+    },
+    {
+      "key": "transformSkipFast",
+      "option": "TransformSkipFast",
+      "label": "Tìm transform skip nhanh",
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "type": "bool",
+      "help": "Hạn chế các trường hợp thử transform skip để giảm công việc. Tắt để xét rộng hơn trong các TU đủ điều kiện. Chỉ có tác dụng khi TransformSkip bật."
+    },
+    {
+      "key": "rdoq",
+      "option": "RDOQ",
+      "label": "RDOQ cho biến đổi thường",
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "type": "bool",
+      "help": "Chọn mức lượng tử có xét chi phí RD cho các TU dùng biến đổi. Có thể đổi hệ số, R, D và mode tốt nhất. Tùy chọn này cũng tác động residual Inter nếu chọn GOP P/B."
+    },
+    {
+      "key": "rdoqTs",
+      "option": "RDOQTS",
+      "label": "RDOQ cho transform skip",
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "type": "bool",
+      "help": "RDOQ riêng cho nhánh transform skip; chỉ có tác dụng khi TransformSkip bật. Muốn tắt RDOQ trên cả hai nhánh, tắt cả RDOQ và RDOQTS."
+    },
+    {
+      "key": "intraQpOffset",
+      "option": "IntraQPOffset",
+      "label": "Offset QP của I-frame",
+      "default": -1,
+      "min": -6,
+      "max": 6,
+      "type": "int",
+      "help": "Cộng vào QP cơ sở của I-slice trước khi clip. Bộ All Intra của Lab dùng offset 0; Low Delay P/B cũ dùng −1. Không áp offset này riêng cho CU Intra nằm trong P/B-slice."
+    }
+  ],
+  "presets": [
+    {
+      "id": "allintra-base",
+      "label": "Intra · Mốc QP 32",
+      "overrides": {},
+      "guide": "Mốc: 5 I-frame, QP frame=32. Theo dõi 35 mode → shortlist → RD luma/TU → chroma → RD CU."
+    },
+    {
+      "id": "allintra-qp22",
+      "label": "Intra · QP 22",
+      "overrides": {
+        "qp": 22
+      },
+      "guide": "So với mốc: quan sát λ, R, D, mode/TU và ảnh CTU khi giảm QP."
+    },
+    {
+      "id": "allintra-qp42",
+      "label": "Intra · QP 42",
+      "overrides": {
+        "qp": 42
+      },
+      "guide": "So với mốc: quan sát lượng tử mạnh hơn và các quyết định RD thực tế."
+    },
+    {
+      "id": "allintra-no-mpm",
+      "label": "Intra · Không bổ sung MPM",
+      "overrides": {
+        "fastIntraMpm": 0
+      },
+      "guide": "So danh sách mode được giữ và số lượt RD. Bảng số mode cơ sở cũng đổi, nên số lượt không nhất thiết giảm."
+    },
+    {
+      "id": "allintra-no-smoothing",
+      "label": "Intra · Tắt strong smoothing",
+      "overrides": {
+        "strongSmoothing": 0
+      },
+      "guide": "Tìm lượt PU luma 32×32 bị ảnh hưởng. Kết quả có thể giống nhau nếu điều kiện strong smoothing không thỏa."
+    },
+    {
+      "id": "allintra-tu1",
+      "label": "Intra · TU depth 1",
+      "overrides": {
+        "tuDepthIntra": 1
+      },
+      "guide": "So cây TU được thử, số nút trả kết quả và D/R/J của cùng CU."
+    },
+    {
+      "id": "allintra-no-ts",
+      "label": "Intra · Tắt transform skip",
+      "overrides": {
+        "transformSkip": 0
+      },
+      "guide": "So kết quả các CU nhỏ. TransformSkipFast/RDOQTS không có tác dụng khi TransformSkip tắt."
+    },
+    {
+      "id": "allintra-ts-full",
+      "label": "Intra · Mở rộng thử transform skip",
+      "overrides": {
+        "transformSkipFast": 0
+      },
+      "guide": "Giữ TransformSkip=1, tắt giới hạn tìm nhanh. Quan sát mode và D/R/J; không bảo đảm bitstream đổi."
+    },
+    {
+      "id": "allintra-no-rdoq",
+      "label": "Intra · Tắt RDOQ cả hai nhánh",
+      "overrides": {
+        "rdoq": 0,
+        "rdoqTs": 0
+      },
+      "guide": "Tắt RDOQ và RDOQTS cùng lúc để xem tác động của quyết định lượng tử lên D/R/J."
+    }
+  ]
+}

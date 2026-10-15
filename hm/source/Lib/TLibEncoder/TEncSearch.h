@@ -315,7 +315,7 @@ protected:
                                     TComMv&     rcMvPred,
                                     Int&        riMVPIdx,
                                     UInt&       ruiBits,
-                                    Distortion& ruiCost );
+                                    Distortion& ruiCost, Int labPu, Int labRef );
 
   Distortion xGetTemplateCost    ( TComDataCU*  pcCU,
                                     UInt        uiPartAddr,

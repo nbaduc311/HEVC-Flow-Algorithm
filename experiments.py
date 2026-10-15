@@ -10,6 +10,8 @@ import shutil
 import subprocess
 import time
 from datetime import datetime, timezone
+from intra_data import build_intra_bundle
+from inter_data import build_inter_bundle
 
 ROOT = Path(__file__).resolve().parent
 def find_encoder():
@@ -23,6 +25,14 @@ INPUT = ROOT / 'data/sample_576x324_10bit.yuv'
 PUBLIC = ROOT / 'web/runs'
 RAW = ROOT / 'data/runs'
 DEFAULTS = dict(qp=32, searchRange=64, mergeCandidates=5, esd=0, fdm=1, cfm=0, ecu=0, amp=1, profile='P', ctuX=4, ctuY=1)
+INTRA_CATALOG = json.loads((ROOT/'web/intra-config.json').read_text(encoding='utf-8'))
+INTRA_OPTIONS = INTRA_CATALOG['options']
+DEFAULTS.update({item['key']:item['default'] for item in INTRA_OPTIONS})
+INTRA_PRESETS = INTRA_CATALOG['presets']
+
+def intra_preset(item):
+    return DEFAULTS | dict(profile='I', intraQpOffset=0) | item['overrides']
+
 PRESETS = [
     ('baseline', 'Mốc · QP 32', {}),
     ('qp22', 'QP 22 · tăng chất lượng', dict(qp=22)),
@@ -38,13 +48,15 @@ def validate(raw):
     if not isinstance(raw, dict) or set(raw)-set(DEFAULTS):
         raise ValueError('Cấu hình có trường không hợp lệ.')
     c = DEFAULTS | raw
+    if raw.get("profile")=="I" and "intraQpOffset" not in raw:c["intraQpOffset"]=0
     ranges = dict(qp=(0,51), searchRange=(4,128), mergeCandidates=(1,5), ctuX=(0,8), ctuY=(0,5))
+    ranges.update({item['key']:(item['min'],item['max']) for item in INTRA_OPTIONS})
     ranges.update({k:(0,1) for k in ('esd','fdm','cfm','ecu','amp')})
     for key,(lo,hi) in ranges.items():
         if type(c[key]) is not int or not lo <= c[key] <= hi:
             raise ValueError(f'{key} phải là số nguyên trong [{lo}, {hi}].')
-    if c['profile'] not in ('P','B'):
-        raise ValueError('profile phải là P hoặc B.')
+    if c['profile'] not in ('P','B','I'):
+        raise ValueError('profile phải là P, B hoặc I (All Intra).')
     return c
 
 def atomic_json(path, value):
@@ -67,13 +79,18 @@ def run_experiment(config, run_id=None, label=None, publish=True):
     run_id=run_id or ('run-'+datetime.now().strftime('%Y%m%d-%H%M%S')+'-'+os.urandom(3).hex())
     out=RAW/run_id; public=PUBLIC/run_id
     out.mkdir(parents=True, exist_ok=True); public.mkdir(parents=True, exist_ok=True)
-    profile='encoder_lowdelay_P_main10.cfg' if config['profile']=='P' else 'encoder_lowdelay_main10.cfg'
+    profile={'P':'encoder_lowdelay_P_main10.cfg','B':'encoder_lowdelay_main10.cfg','I':'encoder_intra_main10.cfg'}[config['profile']]
     cfg=ROOT/'hm/cfg'/profile
     args=[str(encoder), '-c',str(cfg), '-i',str(INPUT), '-o',str(out/'recon.yuv'), '-b',str(out/'stream.265'),
           '-wdt','576','-hgt','324','-fr','8','-f','5','--InputBitDepth=10','--ConformanceWindowMode=1',
           '-q',str(config['qp']), '--SearchRange='+str(config['searchRange']), '--MaxNumMergeCand='+str(config['mergeCandidates'])]
     for key,opt in dict(esd='ESD',fdm='FDM',cfm='CFM',ecu='ECU',amp='AMP').items():
         args.append('--'+opt+'='+str(config[key]))
+    for item in INTRA_OPTIONS:
+        args.append('--'+item['option']+'='+str(config[item['key']]))
+    if config['profile']=='I':args.append('--LambdaFromQpEnable=1')
+    # All Intra does not open the Inter trace, including when reusing a run ID.
+    (out/'inter.jsonl').unlink(missing_ok=True)
     env=os.environ | dict(VISUAL_CTU_X='0', VISUAL_CTU_Y='0', VISUAL_CU_SIZE='0', VISUAL_POC='-1', VISUAL_DUMP_EXIT='0',
         VISUAL_OUTPUT_DIR=str(out), INTER_LAB_TRACE='1', INTER_LAB_CTU_X=str(config['ctuX']), INTER_LAB_CTU_Y=str(config['ctuY']))
     start=time.perf_counter()
@@ -136,10 +153,20 @@ def run_experiment(config, run_id=None, label=None, publish=True):
     command=' '.join(f'{k}={shlex.quote(env[k])}' for k in ('VISUAL_CTU_X','VISUAL_CTU_Y','VISUAL_CU_SIZE','VISUAL_POC','VISUAL_DUMP_EXIT','VISUAL_OUTPUT_DIR','INTER_LAB_TRACE','INTER_LAB_CTU_X','INTER_LAB_CTU_Y'))+' '+shlex.join(args)
     provenance=dict(command=command,input=str(INPUT.relative_to(ROOT)),inputSha256=hashlib.sha256(INPUT.read_bytes()).hexdigest(),
         encoderSha256=hashlib.sha256(encoder.read_bytes()).hexdigest(),configFile=profile,configText=cfg.read_text(encoding='utf-8'),bitDepth=10,roi=dict(x=config['ctuX']*64,y=config['ctuY']*64,size=64))
+    intra_path=build_intra_bundle(out/"intra.jsonl",public,events,atomic_json)
+    if intra_path:
+        summary['intraStats']=json.loads((PUBLIC.parent/intra_path).read_text(encoding='utf-8'))['stats']
+    inter_path=build_inter_bundle(out/"inter.jsonl",public,events,atomic_json)
     bundle=dict(summary=summary,provenance=provenance,frames=frames,events=events)
+    if intra_path: bundle["intraPath"]=intra_path
+    if inter_path:
+        bundle["interPath"]=inter_path
+        bundle["interTraceVersion"]=2
     atomic_json(public/'result.json',bundle)
     for name in ('encoder.log','decisions.jsonl','stream.265'):
         (public/name).write_bytes((out/name).read_bytes())
+    if (out/'intra.jsonl').exists(): (public/'intra.jsonl').write_bytes((out/'intra.jsonl').read_bytes())
+    if (out/'inter.jsonl').exists(): (public/'inter.jsonl').write_bytes((out/'inter.jsonl').read_bytes())
     (public/'command.txt').write_text(command+'\n', encoding='utf-8')
     (public/'encoder.cfg').write_text(cfg.read_text(encoding='utf-8')+'\n# Overrides: '+json.dumps(config)+'\n', encoding='utf-8')
     items=[r for r in manifest() if r['id']!=run_id]+[summary]
@@ -147,9 +174,12 @@ def run_experiment(config, run_id=None, label=None, publish=True):
     return summary
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser(); parser.add_argument('--presets',action='store_true'); parser.add_argument('--config',default='{}')
+    parser=argparse.ArgumentParser(); parser.add_argument('--presets',action='store_true'); parser.add_argument('--intra-presets',action='store_true'); parser.add_argument('--config',default='{}')
     args=parser.parse_args()
-    if args.presets:
+    if args.intra_presets:
+        for item in INTRA_PRESETS:
+            print(json.dumps(run_experiment(intra_preset(item),item['id']+'-ctu4-1',item['label']),ensure_ascii=False),flush=True)
+    elif args.presets:
         for key,label,overrides in PRESETS:
             config=DEFAULTS|overrides
             run_id=f"{key}-ctu{config['ctuX']}-{config['ctuY']}"

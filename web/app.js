@@ -106,12 +106,12 @@
     const selected=current();
     if(selected) {
       const {node,pu,puIndex}=selected;
-      ctx.strokeStyle='#fff1c5';ctx.lineWidth=3;
+      ctx.strokeStyle='#fff1c5';ctx.lineWidth=1.5;
       ctx.strokeRect(node.x+1.5,node.y+1.5,node.width-3,node.height-3);
       for(const [index,part] of (node.pus||[]).entries()) {
         const color=puColor(index);
         ctx.fillStyle=puFill(index,index===puIndex);ctx.fillRect(part.x,part.y,part.width,part.height);
-        ctx.strokeStyle=index===puIndex?'#fff7dd':color;ctx.lineWidth=index===puIndex?2.5:1.5;
+        ctx.strokeStyle=index===puIndex?'#fff7dd':color;ctx.lineWidth=index===puIndex?1.25:.75;
         ctx.strokeRect(part.x+.75,part.y+.75,part.width-1.5,part.height-1.5);
         if(part.width>=31&&part.height>=18){ctx.fillStyle='#07131bdd';ctx.fillRect(part.x+2,part.y+2,32,15);ctx.fillStyle='#fff';ctx.font='bold 10px ui-monospace,monospace';ctx.fillText(`PU${index+1}`,part.x+5,part.y+13)}
       }
@@ -128,13 +128,13 @@
     const img=(state.showRecon?recon:original)[state.frame];
     ctx.fillStyle='#07131c';ctx.fillRect(0,0,size,size);
     if(hasImage(img))ctx.drawImage(img,node.x,node.y,node.width,node.height,0,0,size,size);
-    ctx.strokeStyle='#fff1c5';ctx.lineWidth=4;ctx.strokeRect(2,2,size-4,size-4);
+    ctx.strokeStyle='#fff1c5';ctx.lineWidth=2;ctx.strokeRect(2,2,size-4,size-4);
     for(const [index,part] of parts.entries()) {
       const x=(part.x-node.x)*size/node.width,y=(part.y-node.y)*size/node.height;
       const w=part.width*size/node.width,h=part.height*size/node.height;
       const color=puColor(index);
       ctx.fillStyle=puFill(index,index===puIndex);ctx.fillRect(x,y,w,h);
-      ctx.strokeStyle=index===puIndex?'#fffbea':color;ctx.lineWidth=index===puIndex?5:3;
+      ctx.strokeStyle=index===puIndex?'#fffbea':color;ctx.lineWidth=index===puIndex?2.5:1.5;
       ctx.strokeRect(x+2,y+2,w-4,h-4);
       const labelWidth=Math.min(w-10,53);
       if(labelWidth>=38&&h>=27){ctx.fillStyle=color;ctx.fillRect(x+5,y+5,labelWidth,22);ctx.fillStyle='#0a1620';ctx.font='bold 12px ui-monospace,monospace';ctx.fillText(`PU ${index+1}`,x+9,y+21)}
@@ -158,7 +158,7 @@
       $('referenceNote').textContent='Vạch vàng chỉ vị trí mẫu trên và trái của PU. Ảnh WebP tái tạo sau lọc chỉ minh họa; HM dự đoán từ mẫu tái tạo 10-bit trước lọc.';
       const img=recon[state.frame];if(hasImage(img))ctx.drawImage(img,0,0,D.width,D.height);
       ctx.fillStyle='#c7afff33';ctx.fillRect(p.x,p.y,p.width,p.height);
-      ctx.strokeStyle='#d7c7ff';ctx.lineWidth=2;ctx.strokeRect(p.x+1,p.y+1,p.width-2,p.height-2);
+      ctx.strokeStyle='#d7c7ff';ctx.lineWidth=1;ctx.strokeRect(p.x+1,p.y+1,p.width-2,p.height-2);
       ctx.strokeStyle='#ffd38c';ctx.lineWidth=4;
       if(p.y>0){ctx.beginPath();ctx.moveTo(p.x,p.y-1);ctx.lineTo(Math.min(D.width,p.x+2*p.width),p.y-1);ctx.stroke()}
       if(p.x>0){ctx.beginPath();ctx.moveTo(p.x-1,p.y);ctx.lineTo(p.x-1,Math.min(D.height,p.y+2*p.height));ctx.stroke()}
@@ -173,9 +173,9 @@
     $('referenceTag').textContent=`MV (${format(ref.mv_x_qpel/4)}, ${format(ref.mv_y_qpel/4)}) px`;
     if(hasImage(img))ctx.drawImage(img,0,0,D.width,D.height);
     const sx=p.x+ref.mv_x_qpel/4,sy=p.y+ref.mv_y_qpel/4;
-    ctx.setLineDash([5,4]);ctx.strokeStyle='#ffffffb8';ctx.lineWidth=1.5;ctx.strokeRect(p.x+.75,p.y+.75,p.width,p.height);ctx.setLineDash([]);
+    ctx.setLineDash([5,4]);ctx.strokeStyle='#ffffffb8';ctx.lineWidth=.75;ctx.strokeRect(p.x+.75,p.y+.75,p.width,p.height);ctx.setLineDash([]);
     ctx.fillStyle='#ffce7955';ctx.fillRect(sx,sy,p.width,p.height);
-    ctx.strokeStyle='#ffdc91';ctx.lineWidth=3;ctx.strokeRect(sx+1.5,sy+1.5,p.width-3,p.height-3);
+    ctx.strokeStyle='#ffdc91';ctx.lineWidth=1.5;ctx.strokeRect(sx+1.5,sy+1.5,p.width-3,p.height-3);
     ctx.beginPath();ctx.moveTo(p.x+p.width/2,p.y+p.height/2);ctx.lineTo(sx+p.width/2,sy+p.height/2);ctx.strokeStyle='#ffd384';ctx.lineWidth=2;ctx.stroke();
   }
   function patch(canvas,img,x,y,w,h) {
@@ -196,7 +196,7 @@
       const a=$('originalPatch').getContext('2d').getImageData(0,0,residual.width,residual.height).data;
       const b=$('predictionPatch').getContext('2d').getImageData(0,0,residual.width,residual.height).data;
       const out=ctx.createImageData(residual.width,residual.height);let sum=0;
-      for(let i=0;i<a.length;i+=4){const d=((a[i]-b[i])+(a[i+1]-b[i+1])+(a[i+2]-b[i+2]))/3;sum+=Math.abs(d);const v=Math.min(255,Math.abs(d)*4);out.data[i]=d>=0?v:27;out.data[i+1]=d>=0?Math.round(v*.53):Math.round(v*.58);out.data[i+2]=d>=0?35:v;out.data[i+3]=255}
+      for(let i=0;i<a.length;i+=4){const d=((a[i]-b[i])+(a[i+1]-b[i+1])+(a[i+2]-b[i+2]))/3;sum+=Math.abs(d);const v=Math.min(255,Math.abs(d));out.data[i]=d>=0?v:27;out.data[i+1]=d>=0?Math.round(v*.53):Math.round(v*.58);out.data[i+2]=d>=0?35:v;out.data[i+3]=255}
       ctx.putImageData(out,0,0);
       $('compareNote').textContent=`${intra?'Mode Intra lấy từ trace HM; Prediction dựng gần đúng bằng mẫu WebP cùng frame.':(p.inter_dir===3?'PU bi-pred: ô này chỉ minh họa nhánh L0, không phải predictor kết hợp L0/L1.':'MV lấy từ trace HM; Prediction lấy mẫu WebP theo MV.')} MAE minh họa 8-bit: ${format(sum/(residual.width*residual.height))}. Đây không phải residual hoặc distortion RD 10-bit của HM.`;
     } else $('compareNote').textContent='Đang nạp ảnh để dựng prediction và residual minh họa.';

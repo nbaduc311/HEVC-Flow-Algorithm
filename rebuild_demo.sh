@@ -12,6 +12,7 @@ fi
 
 # The bundled five-frame input makes the lab independent of the original video.
 python3 experiments.py --presets
+python3 experiments.py --intra-presets
 cp data/runs/baseline-ctu4-1/trace.jsonl data/trace.jsonl
 cp data/runs/baseline-ctu4-1/stream.265 data/sample.265
 for name in orig recon; do
@@ -26,4 +27,7 @@ for name in orig recon; do
 done
 python3 build_data.py
 python3 test_experiments.py
-echo "Đã tạo lại 8 preset và dữ liệu demo. Chạy ./run.sh để mở Lab."
+python3 test_intra.py
+python3 test_inter.py
+python3 test_intra_config.py
+echo "Đã tạo lại 8 preset Inter, 9 preset All Intra và dữ liệu demo. Chạy ./run.sh để mở Lab."

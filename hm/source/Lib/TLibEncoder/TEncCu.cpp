@@ -1506,6 +1506,7 @@ Void TEncCu::xCheckRDCostMerge2Nx2N( TComDataCU*& rpcBestCU, TComDataCU*& rpcTem
   }
   UChar uhDepth = rpcTempCU->getDepth( 0 );
   rpcTempCU->setPartSizeSubParts( SIZE_2Nx2N, 0, uhDepth ); // interprets depth relative to CTU level
+  VisualDumper::getInstance()->labInterBegin(rpcTempCU,"MERGE_2Nx2N");
 #if MCTS_ENC_CHECK
   UInt numSpatialMergeCandidates = 0;
   rpcTempCU->getInterMergeCandidates( 0, 0, cMvFieldNeighbours, uhInterDirNeighbours, numValidMergeCand, numSpatialMergeCandidates );
@@ -1513,6 +1514,9 @@ Void TEncCu::xCheckRDCostMerge2Nx2N( TComDataCU*& rpcBestCU, TComDataCU*& rpcTem
   rpcTempCU->getInterMergeCandidates( 0, 0, cMvFieldNeighbours,uhInterDirNeighbours, numValidMergeCand );
 #endif
 
+  for(Int labI=0;labI<numValidMergeCand;++labI) {
+    LAB_INTER(rpcTempCU,0,"MERGE_LIST",",\"candidate\":"<<labI<<",\"dir\":"<<Int(uhInterDirNeighbours[labI])<<",\"fields\":"<<VisualDumper::labFields(rpcTempCU,&cMvFieldNeighbours[2*labI],uhInterDirNeighbours[labI]));
+  }
   Int mergeCandBuffer[MRG_MAX_NUM_CANDS];
   for( UInt ui = 0; ui < numValidMergeCand; ++ui )
   {
@@ -1636,6 +1640,7 @@ Void TEncCu::xCheckRDCostMerge2Nx2N( TComDataCU*& rpcBestCU, TComDataCU*& rpcTem
       }
     }
   }
+  LAB_INTER(rpcBestCU,0,"MERGE_END",",\"earlySkipEnabled\":"<<(m_pcEncCfg->getUseEarlySkipDetection()?"true":"false")<<",\"earlyDetected\":"<<(*earlyDetectionSkipMode?"true":"false")<<",\"bestCbf\":"<<Int(rpcBestCU->getQtRootCbf(0))<<",\"bestMerge\":"<<(rpcBestCU->getMergeFlag(0)?"true":"false"));
   DEBUG_STRING_APPEND(sDebug, bestStr)
 }
 
@@ -1663,6 +1668,7 @@ Void TEncCu::xCheckRDCostInter( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, 
 
   rpcTempCU->setPartSizeSubParts  ( ePartSize,  0, uhDepth );
   rpcTempCU->setPredModeSubParts  ( MODE_INTER, 0, uhDepth );
+  VisualDumper::getInstance()->labInterBegin(rpcTempCU,"INTER");
   rpcTempCU->setChromaQpAdjSubParts( rpcTempCU->getCUTransquantBypass(0) ? 0 : m_cuChromaQpOffsetIdxPlus1, 0, uhDepth );
 
 #if MCTS_ENC_CHECK
@@ -1730,6 +1736,7 @@ Void TEncCu::xCheckRDCostIntra( TComDataCU *&rpcBestCU,
 
   Pel resiLuma[NUMBER_OF_STORED_RESIDUAL_TYPES][MAX_CU_SIZE * MAX_CU_SIZE];
 
+  VisualDumper::getInstance()->labIntraBegin(rpcTempCU);
   m_pcPredSearch->estIntraPredLumaQT( rpcTempCU, m_ppcOrigYuv[uiDepth], m_ppcPredYuvTemp[uiDepth], m_ppcResiYuvTemp[uiDepth], m_ppcRecoYuvTemp[uiDepth], resiLuma DEBUG_STRING_PASS_INTO(sTest) );
 
   m_ppcRecoYuvTemp[uiDepth]->copyToPicComponent(COMPONENT_Y, rpcTempCU->getPic()->getPicYuvRec(), rpcTempCU->getCtuRsAddr(), rpcTempCU->getZorderIdxInCtu() );

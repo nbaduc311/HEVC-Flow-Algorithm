@@ -7,10 +7,15 @@
 #include <iostream>
 #include <vector>
 #include <map>
+#include <sstream>
+#include <iomanip>
 
 class TComDataCU;
 class TComYuv;
 class TComRdCost;
+class TComTU;
+class TComMv;
+class TComMvField;
 
 #define ENABLE_VISUAL_DUMP 1
 
@@ -20,7 +25,15 @@ private:
     std::string m_outputDir;
     std::ofstream m_outFile;
     std::ofstream m_labFile;
-    Bool labActive(TComDataCU* cu);
+    Bool labActive(const TComDataCU* cu);
+    std::ofstream m_labInterFile;
+    UInt m_labInterSearch, m_labMotionAttempt;
+    const TComDataCU* m_labMotionCU;
+    Int m_labMotionPU;
+    std::ofstream m_labIntraFile;
+    UInt m_labIntraSearch, m_labIntraAttempt, m_labLumaBits;
+    const char* m_labIntraPass;
+    std::string labIntraPrefix(TComDataCU* cu, TComTU& tu, const char* stage);
     std::vector<std::string> m_labRate;
     std::map<UInt, std::vector<std::string> > m_labChildren;
     UInt m_labLastBits;
@@ -90,6 +103,22 @@ public:
 
     Void dumpModeTrial(TComDataCU* cu, TComDataCU* best, UInt depth, TComRdCost* rd,
                        const char* phase, Int noResidual, TComYuv* org, TComYuv* pred, TComYuv* reco);
+    Bool labInterActive(const TComDataCU* cu);
+    Void labInterBegin(const TComDataCU* cu, const char* kind);
+    Void labInter(const TComDataCU* cu, Int pu, const char* stage, const std::string& fields);
+    Void labMergeSource(const TComDataCU* cu, UInt pu, const char* source, const char* status, Int index, const TComMvField* fields, Int dir);
+    static std::string labMv(const TComMv& mv);
+    static std::string labFields(const TComDataCU* cu, const TComMvField* fields, Int dir);
+    Void labMotionBegin(const TComDataCU* cu, Int pu);
+    Void labMotionEnd() { m_labMotionCU=NULL; }
+    Void labFraction(const TComMv& mv, Int scale, UInt point, Distortion distortion, Distortion rateCost, Distortion cost, Distortion best, Bool hadamard, UInt bits, Double motionLambda);
+    Void labIntraBegin(TComDataCU* cu);
+    Void labIntraAttempt(TComDataCU* cu, const char* pass);
+    Void labIntraFast(TComDataCU* cu, TComTU& tu, UInt mode, Distortion sad, UInt bits, Double lambda, Double cost, Bool hadamard, Bool filtered, TComYuv* org, TComYuv* pred);
+    Void labIntraList(TComDataCU* cu, TComTU& tu, const char* stage, const UInt* modes, UInt count, UInt baseCount);
+    Void labIntraTu(TComTU& tu, Distortion d, UInt bits, Double lambda, Double cost, Double single, Double split, Bool choseSplit);
+    Void labIntraMode(TComDataCU* cu, TComTU& tu, const char* stage, UInt mode, Distortion d, UInt bits, Double lambda, Double cost, Double best);
+    UInt labLumaBits() const { return m_labLumaBits; }
     Void labRateBegin(TComDataCU* cu);
     Void labRateStep(TComDataCU* cu, const char* label, UInt bits, Int64 fracBits = -1);
     Void labSplitChild(TComDataCU* parent, TComDataCU* child, UInt depth, UInt index);
@@ -108,4 +137,9 @@ public:
     #define DUMP_SET_ROI(poc, ctuX, ctuY, cuSize)
     #define DUMP_SET_CONTEXT(poc, ctuX, ctuY)
 #endif
+
+
+// Build payloads only within the observed CTU; never call coding routines here.
+#define LAB_INTER(cu, pu, stage, fields) do { VisualDumper* labD=VisualDumper::getInstance(); if(labD->labInterActive(cu)) { std::ostringstream labS; labS<<std::setprecision(17)<<fields; labD->labInter(cu,pu,stage,labS.str()); } } while(0)
+
 #endif

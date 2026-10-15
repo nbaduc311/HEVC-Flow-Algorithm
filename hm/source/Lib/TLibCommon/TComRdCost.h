@@ -163,6 +163,7 @@ public:
     m_mvPredictor = rcMv;
   }
   Void    setCostScale( Int iCostScale )    { m_iCostScale = iCostScale; }
+  Double getLabMotionLambda() const { return m_motionLambda / 65536.0; }
   Distortion getCost( UInt b )                 { return Distortion(( m_motionLambda * b ) / 65536.0); }
   Distortion getCostOfVectorWithPredictor( const Int x, const Int y )
   {

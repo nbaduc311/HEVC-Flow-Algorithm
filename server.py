@@ -24,7 +24,7 @@ class Handler(SimpleHTTPRequestHandler):
             job=jobs.get(path.rsplit('/',1)[1])
             return self.reply(200 if job else 404,job or dict(error='Không có job này'))
         if path.startswith('/source/'):
-            allowed={'TEncCu.cpp':'TLibEncoder/TEncCu.cpp','TEncSearch.cpp':'TLibEncoder/TEncSearch.cpp','VisualDumper.cpp':'TLibCommon/VisualDumper.cpp','TComRdCost.cpp':'TLibCommon/TComRdCost.cpp','TEncSlice.cpp':'TLibEncoder/TEncSlice.cpp','TEncTop.cpp':'TLibEncoder/TEncTop.cpp','TEncBinCoderCABACCounter.cpp':'TLibEncoder/TEncBinCoderCABACCounter.cpp'}
+            allowed={'TComDataCU.cpp':'TLibCommon/TComDataCU.cpp','TEncCu.cpp':'TLibEncoder/TEncCu.cpp','TEncSearch.cpp':'TLibEncoder/TEncSearch.cpp','VisualDumper.cpp':'TLibCommon/VisualDumper.cpp','TComRdCost.cpp':'TLibCommon/TComRdCost.cpp','TEncSlice.cpp':'TLibEncoder/TEncSlice.cpp','TEncTop.cpp':'TLibEncoder/TEncTop.cpp','TEncBinCoderCABACCounter.cpp':'TLibEncoder/TEncBinCoderCABACCounter.cpp'}
             name=path.rsplit('/',1)[1]
             if name not in allowed: return self.reply(404,dict(error='Không có file này'))
             payload=(ROOT/'hm/source/Lib'/allowed[name]).read_bytes()

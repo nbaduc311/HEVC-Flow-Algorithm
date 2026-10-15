@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <iomanip>
 #include <cmath>
+#include <limits>
 #include "TComYuv.h"
 #include "TComTU.h"
 #include "TComRdCost.h"
@@ -36,6 +37,8 @@ VisualDumper::VisualDumper() {
     m_dumpCount = 0;
     m_intraSearchCount = 0;
     m_intraRefDumped = false;
+    m_labInterSearch=0;m_labMotionAttempt=0;m_labMotionCU=NULL;m_labMotionPU=0;
+    m_labIntraSearch=0; m_labIntraAttempt=0; m_labLumaBits=0; m_labIntraPass="RDO";
 
     if (m_enabled) {
         const char* envOutDir = getenv("VISUAL_OUTPUT_DIR");
@@ -557,7 +560,7 @@ Void VisualDumper::dumpTransformQuant(Int poc, Int ctuX, Int ctuY, Int tuX, Int 
 }
 
 // Inter Lab observes RD decisions; it never changes encoder state.
-Bool VisualDumper::labActive(TComDataCU* cu) {
+Bool VisualDumper::labActive(const TComDataCU* cu) {
     if (!m_enabled || !getenv("INTER_LAB_TRACE")) return false;
     const char* ex = getenv("INTER_LAB_CTU_X");
     const char* ey = getenv("INTER_LAB_CTU_Y");
@@ -572,7 +575,7 @@ Void VisualDumper::dumpMergePruned(TComDataCU* cu, Int candidate, Int pass, cons
     m_labFile << "{\"event\":\"PRUNED\",\"poc\":" << cu->getSlice()->getPOC()
       << ",\"x\":" << cu->getCUPelX() << ",\"y\":" << cu->getCUPelY()
       << ",\"size\":" << Int(cu->getWidth(0)) << ",\"candidate\":" << candidate
-      << ",\"pass\":" << pass << ",\"reason\":\"" << reason << "\"}\n";
+      << ",\"interSearchId\":" << m_labInterSearch << ",\"pass\":" << pass << ",\"reason\":\"" << reason << "\"}\n";
     m_labFile.flush();
 }
 
@@ -650,6 +653,8 @@ Void VisualDumper::dumpModeTrial(TComDataCU* cu, TComDataCU* best, UInt depth, T
        << ",\"cbf\":" << Int(cu->getQtRootCbf(0)) << ",\"skip\":" << (cu->getSkipFlag(0)?"true":"false")
        << ",\"pass\":" << noResidual << ",\"candidate\":" << (noResidual>=0 ? Int(cu->getMergeIndex(0)) : -1);
 
+    if(std::string(phase)=="INTER" || std::string(phase)=="MERGE")ss<<",\"interSearchId\":"<<m_labInterSearch;
+    if(std::string(phase)=="INTRA")ss<<",\"intraSearchId\":"<<m_labIntraSearch;
     ss << ",\"originVersion\":1,\"rateSteps\":[";
     if(std::string(phase)!="SPLIT")for(UInt i=0;i<m_labRate.size();++i){if(i)ss<<",";ss<<m_labRate[i];}
     ss << "]";
@@ -692,4 +697,94 @@ Void VisualDumper::dumpModeTrial(TComDataCU* cu, TComDataCU* best, UInt depth, T
     }
     ss << "}\n";
     m_labFile << ss.str(); m_labFile.flush();
+}
+
+
+// All Intra instrumentation is observational: no entropy coding calls or CU writes.
+Void VisualDumper::labIntraBegin(TComDataCU* cu) {
+    if(!labActive(cu))return;
+    if(!m_labIntraFile.is_open())m_labIntraFile.open((m_outputDir+"intra.jsonl").c_str());
+    ++m_labIntraSearch;m_labIntraAttempt=0;m_labLumaBits=0;
+}
+Void VisualDumper::labIntraAttempt(TComDataCU* cu,const char* pass) {
+    if(!labActive(cu))return;
+    ++m_labIntraAttempt;m_labIntraPass=pass;
+}
+std::string VisualDumper::labIntraPrefix(TComDataCU* cu,TComTU& tu,const char* stage) {
+    const TComRectangle& r=tu.getRect(COMPONENT_Y);
+    std::stringstream ss;ss<<std::setprecision(17);
+    ss<<"{\"search\":"<<m_labIntraSearch<<",\"stage\":\""<<stage<<"\",\"poc\":"<<cu->getSlice()->getPOC()
+      <<",\"x\":"<<cu->getCUPelX()<<",\"y\":"<<cu->getCUPelY()<<",\"size\":"<<Int(cu->getWidth(0))
+      <<",\"part\":\""<<visualPartSize(cu->getPartitionSize(0))<<"\",\"offset\":"<<tu.GetAbsPartIdxTU()
+      <<",\"px\":"<<r.x0<<",\"py\":"<<r.y0<<",\"width\":"<<r.width<<",\"height\":"<<r.height
+      <<",\"tuDepth\":"<<tu.GetTransformDepthRel()<<",\"attempt\":"<<m_labIntraAttempt;
+    return ss.str();
+}
+Void VisualDumper::labIntraFast(TComDataCU* cu,TComTU& tu,UInt mode,Distortion sad,UInt bits,Double lambda,Double cost,Bool hadamard,Bool filtered,TComYuv* org,TComYuv* pred) {
+    if(!labActive(cu)||!m_labIntraFile.is_open())return;
+    std::stringstream ss;ss<<std::setprecision(17)<<labIntraPrefix(cu,tu,"FAST")
+      <<",\"mode\":"<<mode<<",\"metric\":\""<<(hadamard?"SATD":"SAD")<<"\",\"distortion\":"<<sad
+      <<",\"bits\":"<<bits<<",\"lambda\":"<<lambda<<",\"cost\":"<<cost<<",\"filtered\":"<<(filtered?"true":"false");
+    const UInt patch=std::min<UInt>(8,tu.getRect(COMPONENT_Y).width);ss<<",\"patchSize\":"<<patch;
+    TComYuv* bufs[]={org,pred};const char* names[]={"original","prediction"};
+    for(Int b=0;b<2;++b){ss<<",\""<<names[b]<<"\":[";const Pel* p=bufs[b]->getAddr(COMPONENT_Y,tu.GetAbsPartIdxTU());UInt stride=bufs[b]->getStride(COMPONENT_Y);
+      for(UInt y=0;y<patch;++y){for(UInt x=0;x<patch;++x){if(x||y)ss<<",";ss<<p[y*stride+x];}}
+      ss<<"]";}
+    ss<<"}\n";m_labIntraFile<<ss.str();m_labIntraFile.flush();
+}
+Void VisualDumper::labIntraList(TComDataCU* cu,TComTU& tu,const char* stage,const UInt* modes,UInt count,UInt baseCount) {
+    if(!labActive(cu)||!m_labIntraFile.is_open())return;
+    m_labIntraFile<<labIntraPrefix(cu,tu,stage)<<",\"baseCount\":"<<baseCount<<",\"modes\":[";
+    for(UInt i=0;i<count;++i){if(i)m_labIntraFile<<",";m_labIntraFile<<modes[i];}m_labIntraFile<<"]}\n";m_labIntraFile.flush();
+}
+Void VisualDumper::labIntraTu(TComTU& tu,Distortion d,UInt bits,Double lambda,Double cost,Double single,Double split,Bool choseSplit) {
+    TComDataCU* cu=tu.getCU();if(!labActive(cu)||!m_labIntraFile.is_open())return;
+    m_labLumaBits=bits;
+    std::stringstream ss;ss<<std::setprecision(17)<<labIntraPrefix(cu,tu,"TU")
+      <<",\"pass\":\""<<m_labIntraPass<<"\",\"mode\":"<<Int(cu->getIntraDir(CHANNEL_TYPE_LUMA,tu.GetAbsPartIdxTU()))
+      <<",\"distortion\":"<<d<<",\"bits\":"<<bits<<",\"lambda\":"<<lambda<<",\"cost\":"<<cost
+      <<",\"split\":"<<(choseSplit?"true":"false")<<",\"singleCost\":";
+    if(single<MAX_DOUBLE/2)ss<<single;else ss<<"null";
+    ss<<",\"splitCost\":";if(split<MAX_DOUBLE/2)ss<<split;else ss<<"null";
+    ss<<"}\n";m_labIntraFile<<ss.str();m_labIntraFile.flush();
+}
+Void VisualDumper::labIntraMode(TComDataCU* cu,TComTU& tu,const char* stage,UInt mode,Distortion d,UInt bits,Double lambda,Double cost,Double best) {
+    if(!labActive(cu)||!m_labIntraFile.is_open())return;
+    std::stringstream ss;ss<<std::setprecision(17)<<labIntraPrefix(cu,tu,stage)
+      <<",\"pass\":\""<<m_labIntraPass<<"\",\"mode\":"<<mode<<",\"lumaMode\":"<<Int(cu->getIntraDir(CHANNEL_TYPE_LUMA,tu.GetAbsPartIdxTU()))
+      <<",\"distortion\":"<<d<<",\"bits\":"<<bits<<",\"lambda\":"<<lambda<<",\"cost\":"<<cost<<",\"bestBefore\":";
+    if(best<MAX_DOUBLE/2)ss<<best;else ss<<"null";
+    ss<<",\"accepted\":"<<(cost<best?"true":"false")<<"}\n";m_labIntraFile<<ss.str();m_labIntraFile.flush();
+}
+
+
+Bool VisualDumper::labInterActive(const TComDataCU* cu) { return cu && labActive(cu) && m_labInterSearch>0 && m_labInterFile.is_open(); }
+Void VisualDumper::labInterBegin(const TComDataCU* cu,const char* kind) {
+    if(!labActive(cu))return;
+    if(!m_labInterFile.is_open())m_labInterFile.open((m_outputDir+"inter.jsonl").c_str());
+    ++m_labInterSearch;m_labMotionAttempt=0;m_labMotionCU=NULL;
+    labInter(cu,0,"BEGIN",std::string(",\"kind\":\"")+kind+"\"");
+}
+Void VisualDumper::labInter(const TComDataCU* cu,Int pu,const char* stage,const std::string& fields) {
+    if(!labInterActive(cu))return;
+    Int x,y,w,h;cu->getPartPosition(pu,x,y,w,h);
+    m_labInterFile<<"{\"search\":"<<m_labInterSearch<<",\"stage\":\""<<stage<<"\",\"poc\":"<<cu->getSlice()->getPOC()
+      <<",\"x\":"<<cu->getCUPelX()<<",\"y\":"<<cu->getCUPelY()<<",\"size\":"<<Int(cu->getWidth(0))
+      <<",\"part\":\""<<visualPartSize(cu->getPartitionSize(0))<<"\",\"pu\":"<<pu<<",\"px\":"<<x<<",\"py\":"<<y
+      <<",\"width\":"<<w<<",\"height\":"<<h<<",\"attempt\":"<<m_labMotionAttempt<<fields<<"}\n";
+    m_labInterFile.flush();
+}
+std::string VisualDumper::labMv(const TComMv& mv) {std::ostringstream s;s<<"["<<mv.getHor()<<","<<mv.getVer()<<"]";return s.str();}
+std::string VisualDumper::labFields(const TComDataCU* cu,const TComMvField* fields,Int dir) {
+    std::ostringstream s;s<<"[";for(Int l=0;l<2;++l){if(l)s<<",";if(!(dir&(1<<l))){s<<"null";continue;}
+    Int ref=fields[l].getRefIdx();s<<"{\"ref\":"<<ref<<",\"refPoc\":"<<(ref>=0?cu->getSlice()->getRefPOC(RefPicList(l),ref):-1)<<",\"mv\":"<<labMv(fields[l].getMv())<<"}";}
+    s<<"]";return s.str();
+}
+Void VisualDumper::labMergeSource(const TComDataCU* cu,UInt pu,const char* source,const char* status,Int index,const TComMvField* fields,Int dir) {
+    LAB_INTER(cu,pu,"MERGE_SOURCE",",\"source\":\""<<source<<"\",\"status\":\""<<status<<"\",\"candidate\":"<<index<<",\"dir\":"<<dir<<",\"fields\":"<<(fields?labFields(cu,fields,dir):"[]"));
+}
+Void VisualDumper::labMotionBegin(const TComDataCU* cu,Int pu) {m_labMotionCU=labInterActive(cu)?cu:NULL;m_labMotionPU=pu;if(m_labMotionCU)++m_labMotionAttempt;}
+Void VisualDumper::labFraction(const TComMv& mv,Int scale,UInt point,Distortion distortion,Distortion rateCost,Distortion cost,Distortion best,Bool hadamard,UInt bits,Double motionLambda) {
+    TComMv q(mv.getHor()*scale,mv.getVer()*scale);
+    LAB_INTER(m_labMotionCU,m_labMotionPU,scale==2?"HALF":"QUARTER",",\"bits\":"<<bits<<",\"motionLambda\":"<<motionLambda<<",\"point\":"<<point<<",\"mv\":"<<labMv(q)<<",\"metric\":\""<<(hadamard?"SATD":"SAD")<<"\",\"distortion\":"<<distortion<<",\"rateCost\":"<<rateCost<<",\"cost\":"<<cost<<",\"bestBefore\":"<<(best==std::numeric_limits<Distortion>::max()?"null":std::to_string(best))<<",\"accepted\":"<<(cost<best?"true":"false"));
 }

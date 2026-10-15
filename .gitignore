@@ -22,6 +22,8 @@ venv/
 /data/encoder.log
 /web/runs/run-*/
 /web/runs/*.tmp
+/web/runs/*/intra.jsonl
+/web/runs/*/inter.jsonl
 
 # Credentials / editor state
 .env

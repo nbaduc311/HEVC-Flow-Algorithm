@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>HEVC Intra / Inter Lab · HM trace</title>
-  <link rel="stylesheet" href="style.css"><link rel="stylesheet" href="workspaces.css">
+  <link rel="stylesheet" href="style.css"><link rel="stylesheet" href="workspaces.css"><link rel="stylesheet" href="intra-lab.css"><link rel="stylesheet" href="inter-lab.css">
 </head>
 <body>
 <main class="shell">
@@ -17,6 +17,8 @@
     <button data-workspace="pixels">04 <span>Pixel 10-bit</span></button>
     <button data-workspace="atlas">05 <span>Bản đồ CU / PU</span></button>
     <button data-workspace="evidence">06 <span>Code & bằng chứng</span></button>
+    <button data-workspace="intra">07 <span>Intra chuyên sâu</span></button>
+    <button data-workspace="inter">08 <span>Inter chuyên sâu</span></button>
   </nav>
   <div class="run-strip"><span class="live"><i></i> LẦN CHẠY ĐANG XEM</span><label><span class="sr-only">Chọn lần chạy</span><select id="activeRun"></select></label><span id="runContext">Đang nạp…</span><span id="apiStatus" class="tag">Đang kết nối</span></div>
   <div id="labMessage" role="status" aria-live="polite"></div>
@@ -24,6 +26,8 @@
   <section id="workspace-compare" class="workspace" hidden></section>
   <section id="workspace-flow" class="workspace" hidden></section>
   <section id="workspace-pixels" class="workspace" hidden></section>
+  <section id="workspace-inter" class="workspace" hidden></section>
+  <section id="workspace-intra" class="workspace" hidden></section>
   <section id="workspace-evidence" class="workspace" hidden></section>
   <section id="workspace-atlas" class="workspace" hidden>
   <div class="notice">Bản đồ dưới đây thuộc lần chạy đang chọn. Ảnh WebP và predictor dựng trên trình duyệt dùng để minh họa; mở <button data-workspace="pixels" class="text-button">Pixel 10-bit</button> để xem mẫu HM thật của ứng viên Inter trong CTU được ghi trace.</div>
@@ -34,13 +38,13 @@
     <div class="maincol">
       <section class="panel main-panel"><div class="panel-head"><div><div class="panel-label">ẢNH HIỆN TẠI · CTU / CU / PU</div><h2 id="frameTitle">Đang nạp trace…</h2></div><div class="view-actions"><button id="toggleImage" type="button">Ảnh gốc</button><button id="toggleOverlay" type="button">Ẩn lưới</button></div></div><div class="frame-wrap"><canvas id="frameCanvas" width="576" height="324" aria-label="Chọn CU hoặc PU trên frame"></canvas><div id="frameBadge" class="frame-badge"></div></div><div class="legend"><span><i class="intra"></i>CU Intra</span><span><i class="inter"></i>CU Inter</span><span><i class="skip"></i>CU Skip</span><span><i class="selected-cu"></i>CU đang chọn</span><span><i class="selected"></i>PU đang chọn</span></div><div class="cu-detail"><div class="cu-zoom"><div class="panel-label">PHÓNG TO CU ĐANG CHỌN</div><canvas id="cuCanvas" width="240" height="240" aria-label="Ranh giới các PU trong CU; nhấn để chọn PU"></canvas></div><div class="cu-parts"><h3 id="cuTitle">CU đang chọn</h3><p id="cuHint">Chọn một CU trên ảnh để xem từng PU.</p><div id="puList" class="pu-list" role="group" aria-label="Chọn PU trong CU"></div></div></div></section>
       <section class="panel reference-panel"><div class="panel-head"><div><div class="panel-label" id="referenceLabel">ẢNH THAM CHIẾU TRONG DPB</div><h2 id="referenceTitle">L0 · POC 0</h2></div><span class="tag" id="referenceTag">Khối được lấy mẫu</span></div><div class="reference-wrap"><canvas id="referenceCanvas" width="576" height="324" aria-label="Ảnh hoặc mẫu tham chiếu và vị trí lấy mẫu"></canvas><div id="referenceEmpty" class="reference-empty" hidden>Không có ảnh tham chiếu.</div></div><div class="small-note" id="referenceNote">Khung viền là tọa độ lấy mẫu từ MV thật. Ảnh tham chiếu hiển thị là frame tái tạo do HM ghi ra.</div></section>
-      <section class="panel compare-panel"><div class="panel-head"><div><div class="panel-label">SO SÁNH KHỐI ĐÃ CHỌN</div><h2>Original · Prediction · Residual · Reconstruction</h2></div><span class="tag">PHÓNG TO PU</span></div><div class="compare-grid"><figure><canvas id="originalPatch" width="160" height="160"></canvas><figcaption><b>Original</b><small>Ảnh gốc</small></figcaption></figure><figure><canvas id="predictionPatch" width="160" height="160"></canvas><figcaption><b>Prediction</b><small id="predictionCaption">Lấy mẫu WebP theo MV</small></figcaption></figure><figure><canvas id="residualPatch" width="160" height="160"></canvas><figcaption><b>Residual</b><small>Hiệu ảnh 8-bit · tăng tương phản</small></figcaption></figure><figure><canvas id="reconPatch" width="160" height="160"></canvas><figcaption><b>Reconstruction</b><small>Ảnh tái tạo HM</small></figcaption></figure></div><div id="compareNote" class="small-note"></div></section>
+      <section class="panel compare-panel"><div class="panel-head"><div><div class="panel-label">SO SÁNH KHỐI ĐÃ CHỌN</div><h2>Original · Prediction · Residual · Reconstruction</h2></div><span class="tag">PHÓNG TO PU</span></div><div class="compare-grid"><figure><canvas id="originalPatch" width="160" height="160"></canvas><figcaption><b>Original</b><small>Ảnh gốc</small></figcaption></figure><figure><canvas id="predictionPatch" width="160" height="160"></canvas><figcaption><b>Prediction</b><small id="predictionCaption">Lấy mẫu WebP theo MV</small></figcaption></figure><figure><canvas id="residualPatch" width="160" height="160"></canvas><figcaption><b>Residual</b><small>Hiệu ảnh 8-bit · độ lớn ×1</small></figcaption></figure><figure><canvas id="reconPatch" width="160" height="160"></canvas><figcaption><b>Reconstruction</b><small>Ảnh tái tạo HM</small></figcaption></figure></div><div id="compareNote" class="small-note"></div></section>
     </div>
     <aside class="panel inspector"><div class="panel-label">03 / INSPECTOR</div><h2 id="inspectTitle">PU được chọn</h2><p id="inspectSummary" class="inspect-summary"></p><div id="metrics" class="metrics"></div><div class="step-card"><div class="panel-label" id="stepCount"></div><h3 id="stepTitle"></h3><p id="stepDescription"></p><div id="stepFlow" class="step-flow"></div></div><div class="evidence"><strong>Đối chiếu code HM</strong><a href="/source/VisualDumper.cpp">VisualDumper.cpp ↗</a><a href="/source/TEncCu.cpp">TEncCu.cpp ↗</a><a href="/source/TEncSearch.cpp">TEncSearch.cpp ↗</a></div></aside>
   </div>
   </section>
   <footer><p>5 mẫu Pixabay cố định · 576 × 324 · YUV 4:2:0 10-bit · tốc độ encode quy ước 8 fps. Loại picture H.264 của nguồn và loại slice HEVC của lần chạy là hai thông tin riêng. Trace RD chi tiết chỉ ghi trong một CTU; bản đồ mode cuối cùng bao phủ 5 frame.</p><p><a href="/README.md" target="_blank">Hướng dẫn & phạm vi số liệu ↗</a></p></footer>
 </main>
-<script src="lab-data.js"></script><script src="intra-view.js"></script><script src="app.js"></script><script src="workspaces.js"></script>
+<script src="lab-data.js"></script><script src="intra-view.js"></script><script src="app.js"></script><script src="intra-lab.js"></script><script src="inter-lab.js"></script><script src="ctu-compare.js"></script><script src="workspaces.js"></script>
 </body>
 </html>

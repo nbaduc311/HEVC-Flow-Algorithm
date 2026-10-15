@@ -37,6 +37,7 @@
 */
 
 #include "TComDataCU.h"
+#include "VisualDumper.h"
 #include "TComTU.h"
 #include "TComPic.h"
 
@@ -2174,6 +2175,7 @@ Void TComDataCU::getInterMergeCandidates( UInt uiAbsPartIdx, UInt uiPUIdx, TComM
                        !( uiPUIdx == 1 && (cCurPS == SIZE_Nx2N || cCurPS == SIZE_nLx2N || cCurPS == SIZE_nRx2N) ) &&
                        pcCULeft->isInter( uiLeftPartIdx ) ;
 
+  if (!isAvailableA1) VisualDumper::getInstance()->labMergeSource(this,uiPUIdx,"A1",!pcCULeft?"NO_NEIGHBOR":!pcCULeft->isInter(uiLeftPartIdx)?"INTRA_NEIGHBOR":!pcCULeft->isDiffMER(xP-1,yP+nPSH-1,xP,yP)?"SAME_MER":"SAME_CU_PARTITION",-1,NULL,0);
   if ( isAvailableA1 )
   {
     abCandIsInter[iCount] = true;
@@ -2185,6 +2187,7 @@ Void TComDataCU::getInterMergeCandidates( UInt uiAbsPartIdx, UInt uiPUIdx, TComM
     {
       TComDataCU::getMvField( pcCULeft, uiLeftPartIdx, REF_PIC_LIST_1, pcMvFieldNeighbours[(iCount<<1)+1] );
     }
+    VisualDumper::getInstance()->labMergeSource(this,uiPUIdx,"A1","ADDED",iCount,&pcMvFieldNeighbours[2*iCount],puhInterDirNeighbours[iCount]);
     if ( mrgCandIdx == iCount )
     {
 #if MCTS_ENC_CHECK
@@ -2212,6 +2215,8 @@ Void TComDataCU::getInterMergeCandidates( UInt uiAbsPartIdx, UInt uiPUIdx, TComM
                        !( uiPUIdx == 1 && (cCurPS == SIZE_2NxN || cCurPS == SIZE_2NxnU || cCurPS == SIZE_2NxnD) ) &&
                        pcCUAbove->isInter( uiAbovePartIdx );
 
+  if (!isAvailableB1) VisualDumper::getInstance()->labMergeSource(this,uiPUIdx,"B1",!pcCUAbove?"NO_NEIGHBOR":!pcCUAbove->isInter(uiAbovePartIdx)?"INTRA_NEIGHBOR":!pcCUAbove->isDiffMER(xP+nPSW-1,yP-1,xP,yP)?"SAME_MER":"SAME_CU_PARTITION",-1,NULL,0);
+  if (isAvailableB1 && !( isAvailableB1 && (!isAvailableA1 || !pcCULeft->hasEqualMotion( uiLeftPartIdx, pcCUAbove, uiAbovePartIdx ) ) )) VisualDumper::getInstance()->labMergeSource(this,uiPUIdx,"B1","DUPLICATE",-1,NULL,0);
   if ( isAvailableB1 && (!isAvailableA1 || !pcCULeft->hasEqualMotion( uiLeftPartIdx, pcCUAbove, uiAbovePartIdx ) ) )
   {
     abCandIsInter[iCount] = true;
@@ -2223,6 +2228,7 @@ Void TComDataCU::getInterMergeCandidates( UInt uiAbsPartIdx, UInt uiPUIdx, TComM
     {
       TComDataCU::getMvField( pcCUAbove, uiAbovePartIdx, REF_PIC_LIST_1, pcMvFieldNeighbours[(iCount<<1)+1] );
     }
+    VisualDumper::getInstance()->labMergeSource(this,uiPUIdx,"B1","ADDED",iCount,&pcMvFieldNeighbours[2*iCount],puhInterDirNeighbours[iCount]);
     if ( mrgCandIdx == iCount )
     {
 #if MCTS_ENC_CHECK
@@ -2249,6 +2255,8 @@ Void TComDataCU::getInterMergeCandidates( UInt uiAbsPartIdx, UInt uiPUIdx, TComM
                        pcCUAboveRight->isDiffMER(xP+nPSW, yP-1, xP, yP) &&
                        pcCUAboveRight->isInter( uiAboveRightPartIdx );
 
+  if (!isAvailableB0) VisualDumper::getInstance()->labMergeSource(this,uiPUIdx,"B0",!pcCUAboveRight?"NO_NEIGHBOR":!pcCUAboveRight->isInter(uiAboveRightPartIdx)?"INTRA_NEIGHBOR":!pcCUAboveRight->isDiffMER(xP+nPSW,yP-1,xP,yP)?"SAME_MER":"SAME_CU_PARTITION",-1,NULL,0);
+  if (isAvailableB0 && !( isAvailableB0 && ( !isAvailableB1 || !pcCUAbove->hasEqualMotion( uiAbovePartIdx, pcCUAboveRight, uiAboveRightPartIdx ) ) )) VisualDumper::getInstance()->labMergeSource(this,uiPUIdx,"B0","DUPLICATE",-1,NULL,0);
   if ( isAvailableB0 && ( !isAvailableB1 || !pcCUAbove->hasEqualMotion( uiAbovePartIdx, pcCUAboveRight, uiAboveRightPartIdx ) ) )
   {
     abCandIsInter[iCount] = true;
@@ -2260,6 +2268,7 @@ Void TComDataCU::getInterMergeCandidates( UInt uiAbsPartIdx, UInt uiPUIdx, TComM
     {
       TComDataCU::getMvField( pcCUAboveRight, uiAboveRightPartIdx, REF_PIC_LIST_1, pcMvFieldNeighbours[(iCount<<1)+1] );
     }
+    VisualDumper::getInstance()->labMergeSource(this,uiPUIdx,"B0","ADDED",iCount,&pcMvFieldNeighbours[2*iCount],puhInterDirNeighbours[iCount]);
     if ( mrgCandIdx == iCount )
     {
 #if MCTS_ENC_CHECK
@@ -2286,6 +2295,8 @@ Void TComDataCU::getInterMergeCandidates( UInt uiAbsPartIdx, UInt uiPUIdx, TComM
                        pcCULeftBottom->isDiffMER(xP-1, yP+nPSH, xP, yP) &&
                        pcCULeftBottom->isInter( uiLeftBottomPartIdx ) ;
 
+  if (!isAvailableA0) VisualDumper::getInstance()->labMergeSource(this,uiPUIdx,"A0",!pcCULeftBottom?"NO_NEIGHBOR":!pcCULeftBottom->isInter(uiLeftBottomPartIdx)?"INTRA_NEIGHBOR":!pcCULeftBottom->isDiffMER(xP-1,yP+nPSH,xP,yP)?"SAME_MER":"SAME_CU_PARTITION",-1,NULL,0);
+  if (isAvailableA0 && !( isAvailableA0 && ( !isAvailableA1 || !pcCULeft->hasEqualMotion( uiLeftPartIdx, pcCULeftBottom, uiLeftBottomPartIdx ) ) )) VisualDumper::getInstance()->labMergeSource(this,uiPUIdx,"A0","DUPLICATE",-1,NULL,0);
   if ( isAvailableA0 && ( !isAvailableA1 || !pcCULeft->hasEqualMotion( uiLeftPartIdx, pcCULeftBottom, uiLeftBottomPartIdx ) ) )
   {
     abCandIsInter[iCount] = true;
@@ -2297,6 +2308,7 @@ Void TComDataCU::getInterMergeCandidates( UInt uiAbsPartIdx, UInt uiPUIdx, TComM
     {
       TComDataCU::getMvField( pcCULeftBottom, uiLeftBottomPartIdx, REF_PIC_LIST_1, pcMvFieldNeighbours[(iCount<<1)+1] );
     }
+    VisualDumper::getInstance()->labMergeSource(this,uiPUIdx,"A0","ADDED",iCount,&pcMvFieldNeighbours[2*iCount],puhInterDirNeighbours[iCount]);
     if ( mrgCandIdx == iCount )
     {
 #if MCTS_ENC_CHECK
@@ -2325,7 +2337,10 @@ Void TComDataCU::getInterMergeCandidates( UInt uiAbsPartIdx, UInt uiPUIdx, TComM
                          pcCUAboveLeft->isDiffMER(xP-1, yP-1, xP, yP) &&
                          pcCUAboveLeft->isInter( uiAboveLeftPartIdx );
 
-    if ( isAvailableB2 && ( !isAvailableA1 || !pcCULeft->hasEqualMotion( uiLeftPartIdx, pcCUAboveLeft, uiAboveLeftPartIdx ) )
+    if (!isAvailableB2) VisualDumper::getInstance()->labMergeSource(this,uiPUIdx,"B2",!pcCUAboveLeft?"NO_NEIGHBOR":!pcCUAboveLeft->isInter(uiAboveLeftPartIdx)?"INTRA_NEIGHBOR":!pcCUAboveLeft->isDiffMER(xP-1,yP-1,xP,yP)?"SAME_MER":"SAME_CU_PARTITION",-1,NULL,0);
+  if (isAvailableB2 && !( isAvailableB2 && ( !isAvailableA1 || !pcCULeft->hasEqualMotion( uiLeftPartIdx, pcCUAboveLeft, uiAboveLeftPartIdx ) )
+        && ( !isAvailableB1 || !pcCUAbove->hasEqualMotion( uiAbovePartIdx, pcCUAboveLeft, uiAboveLeftPartIdx ) ) )) VisualDumper::getInstance()->labMergeSource(this,uiPUIdx,"B2","DUPLICATE",-1,NULL,0);
+  if ( isAvailableB2 && ( !isAvailableA1 || !pcCULeft->hasEqualMotion( uiLeftPartIdx, pcCUAboveLeft, uiAboveLeftPartIdx ) )
         && ( !isAvailableB1 || !pcCUAbove->hasEqualMotion( uiAbovePartIdx, pcCUAboveLeft, uiAboveLeftPartIdx ) ) )
     {
       abCandIsInter[iCount] = true;
@@ -2337,7 +2352,8 @@ Void TComDataCU::getInterMergeCandidates( UInt uiAbsPartIdx, UInt uiPUIdx, TComM
       {
         TComDataCU::getMvField( pcCUAboveLeft, uiAboveLeftPartIdx, REF_PIC_LIST_1, pcMvFieldNeighbours[(iCount<<1)+1] );
       }
-      if ( mrgCandIdx == iCount )
+      VisualDumper::getInstance()->labMergeSource(this,uiPUIdx,"B2","ADDED",iCount,&pcMvFieldNeighbours[2*iCount],puhInterDirNeighbours[iCount]);
+    if ( mrgCandIdx == iCount )
       {
 #if MCTS_ENC_CHECK
         numSpatialMergeCandidates = iCount + 1;
@@ -2429,10 +2445,12 @@ Void TComDataCU::getInterMergeCandidates( UInt uiAbsPartIdx, UInt uiPUIdx, TComM
       }
     }
 
+    if (dir == 0) VisualDumper::getInstance()->labMergeSource(this,uiPUIdx,"TMVP","UNAVAILABLE",-1,NULL,0);
     if (dir != 0)
     {
       puhInterDirNeighbours[uiArrayAddr] = dir;
       abCandIsInter[uiArrayAddr] = true;
+      VisualDumper::getInstance()->labMergeSource(this,uiPUIdx,"TMVP","ADDED",iCount,&pcMvFieldNeighbours[2*iCount],dir);
 
       if ( mrgCandIdx == iCount )
       {
@@ -2475,9 +2493,12 @@ Void TComDataCU::getInterMergeCandidates( UInt uiAbsPartIdx, UInt uiPUIdx, TComM
         if (iRefPOCL0 == iRefPOCL1 && pcMvFieldNeighbours[(uiArrayAddr<<1)].getMv() == pcMvFieldNeighbours[(uiArrayAddr<<1)+1].getMv())
         {
           abCandIsInter[uiArrayAddr] = false;
+          VisualDumper::getInstance()->labMergeSource(this,uiPUIdx,"COMBINED","SAME_POC_AND_MV",-1,NULL,0);
         }
         else
         {
+          VisualDumper::getInstance()->labMergeSource(this,uiPUIdx,"COMBINED","ADDED",uiArrayAddr,&pcMvFieldNeighbours[2*uiArrayAddr],3);
+          LAB_INTER(this,uiPUIdx,"COMBINE_PAIR",",\"candidate\":"<<uiArrayAddr<<",\"l0From\":"<<i<<",\"l1From\":"<<j);
           uiArrayAddr++;
         }
       }
@@ -2504,6 +2525,7 @@ Void TComDataCU::getInterMergeCandidates( UInt uiAbsPartIdx, UInt uiPUIdx, TComM
       puhInterDirNeighbours[uiArrayAddr] = 3;
       pcMvFieldNeighbours[(uiArrayAddr << 1) + 1].setMvField(TComMv(0, 0), r);
     }
+    VisualDumper::getInstance()->labMergeSource(this,uiPUIdx,"ZERO","ADDED",uiArrayAddr,&pcMvFieldNeighbours[2*uiArrayAddr],puhInterDirNeighbours[uiArrayAddr]);
     uiArrayAddr++;
 
     if ( refcnt == iNumRefIdx - 1 )
@@ -2639,19 +2661,26 @@ Void TComDataCU::fillMvpCand ( const UInt partIdx, const UInt partAddr, const Re
     }
   }
 
+  auto labAdd = [&](UInt idx, MVP_DIR direction, Bool scaling) -> Bool {
+    const Int before=pInfo->iN;
+    const Bool added=scaling?xAddMVPCandWithScaling(*pInfo,eRefPicList,refIdx,idx,direction):xAddMVPCandUnscaled(*pInfo,eRefPicList,refIdx,idx,direction);
+    const char* source=direction==MD_BELOW_LEFT?"A0":direction==MD_LEFT?"A1":direction==MD_ABOVE_RIGHT?"B0":direction==MD_ABOVE?"B1":"B2";
+    LAB_INTER(this,partIdx,"AMVP_SOURCE",",\"list\":"<<Int(eRefPicList)<<",\"ref\":"<<refIdx<<",\"source\":\""<<source<<"\",\"scalingAllowed\":"<<(scaling?"true":"false")<<",\"status\":\""<<(added?"ADDED":"NO_MATCH")<<"\",\"candidate\":"<<before<<",\"mv\":"<<(added?VisualDumper::labMv(pInfo->m_acMvCand[before]):"null"));
+    return added;
+  };
   // Left predictor search
   if (isScaledFlagLX)
   {
-    Bool bAdded = xAddMVPCandUnscaled( *pInfo, eRefPicList, refIdx, partIdxLB, MD_BELOW_LEFT);
+    Bool bAdded = labAdd(partIdxLB, MD_BELOW_LEFT, false);
     if (!bAdded)
     {
-      bAdded = xAddMVPCandUnscaled( *pInfo, eRefPicList, refIdx, partIdxLB, MD_LEFT );
+      bAdded = labAdd(partIdxLB, MD_LEFT, false);
       if(!bAdded)
       {
-        bAdded = xAddMVPCandWithScaling( *pInfo, eRefPicList, refIdx, partIdxLB, MD_BELOW_LEFT);
+        bAdded = labAdd(partIdxLB, MD_BELOW_LEFT, true);
         if (!bAdded)
         {
-          xAddMVPCandWithScaling( *pInfo, eRefPicList, refIdx, partIdxLB, MD_LEFT );
+          labAdd(partIdxLB, MD_LEFT, true);
         }
       }
     }
@@ -2659,26 +2688,26 @@ Void TComDataCU::fillMvpCand ( const UInt partIdx, const UInt partAddr, const Re
 
   // Above predictor search
   {
-    Bool bAdded = xAddMVPCandUnscaled( *pInfo, eRefPicList, refIdx, partIdxRT, MD_ABOVE_RIGHT);
+    Bool bAdded = labAdd(partIdxRT, MD_ABOVE_RIGHT, false);
     if (!bAdded)
     {
-      bAdded = xAddMVPCandUnscaled( *pInfo, eRefPicList, refIdx, partIdxRT, MD_ABOVE);
+      bAdded = labAdd(partIdxRT, MD_ABOVE, false);
       if(!bAdded)
       {
-        xAddMVPCandUnscaled( *pInfo, eRefPicList, refIdx, partIdxLT, MD_ABOVE_LEFT);
+        labAdd(partIdxLT, MD_ABOVE_LEFT, false);
       }
     }
   }
 
   if(!isScaledFlagLX)
   {
-    Bool bAdded = xAddMVPCandWithScaling( *pInfo, eRefPicList, refIdx, partIdxRT, MD_ABOVE_RIGHT);
+    Bool bAdded = labAdd(partIdxRT, MD_ABOVE_RIGHT, true);
     if (!bAdded)
     {
-      bAdded = xAddMVPCandWithScaling( *pInfo, eRefPicList, refIdx, partIdxRT, MD_ABOVE);
+      bAdded = labAdd(partIdxRT, MD_ABOVE, true);
       if(!bAdded)
       {
-        xAddMVPCandWithScaling( *pInfo, eRefPicList, refIdx, partIdxLT, MD_ABOVE_LEFT);
+        labAdd(partIdxLT, MD_ABOVE_LEFT, true);
       }
     }
   }
@@ -2687,6 +2716,7 @@ Void TComDataCU::fillMvpCand ( const UInt partIdx, const UInt partAddr, const Re
   {
     if ( pInfo->m_acMvCand[ 0 ] == pInfo->m_acMvCand[ 1 ] )
     {
+      LAB_INTER(this,partIdx,"AMVP_SOURCE",",\"list\":"<<Int(eRefPicList)<<",\"ref\":"<<refIdx<<",\"source\":\"SPATIAL\",\"status\":\"DUPLICATE\",\"candidate\":1,\"mv\":"<<VisualDumper::labMv(pInfo->m_acMvCand[1]));
       pInfo->iN = 1;
     }
   }
@@ -2734,7 +2764,8 @@ Void TComDataCU::fillMvpCand ( const UInt partIdx, const UInt partAddr, const Re
     }
     if ( ctuRsAddr >= 0 && xGetColMVP( eRefPicList, ctuRsAddr, absPartAddr, cColMv, refIdx_Col ) )
     {
-      pInfo->m_acMvCand[pInfo->iN++] = cColMv;
+      pInfo->m_acMvCand[pInfo->iN++] = cColMv ; /* traced TMVP_H */
+      LAB_INTER(this,partIdx,"AMVP_SOURCE",",\"list\":"<<Int(eRefPicList)<<",\"ref\":"<<refIdx<<",\"source\":\"TMVP_H\",\"status\":\"ADDED\",\"candidate\":"<<(pInfo->iN-1)<<",\"mv\":"<<VisualDumper::labMv(cColMv));
     }
     else
     {
@@ -2742,7 +2773,8 @@ Void TComDataCU::fillMvpCand ( const UInt partIdx, const UInt partAddr, const Re
       xDeriveCenterIdx( partIdx, uiPartIdxCenter );
       if (xGetColMVP( eRefPicList, getCtuRsAddr(), uiPartIdxCenter,  cColMv, refIdx_Col ))
       {
-        pInfo->m_acMvCand[pInfo->iN++] = cColMv;
+        pInfo->m_acMvCand[pInfo->iN++] = cColMv; /* traced TMVP_CENTER */
+      LAB_INTER(this,partIdx,"AMVP_SOURCE",",\"list\":"<<Int(eRefPicList)<<",\"ref\":"<<refIdx<<",\"source\":\"TMVP_CENTER\",\"status\":\"ADDED\",\"candidate\":"<<(pInfo->iN-1)<<",\"mv\":"<<VisualDumper::labMv(cColMv));
       }
     }
     //----  co-located RightBottom Temporal Predictor  ---//
@@ -2751,6 +2783,7 @@ Void TComDataCU::fillMvpCand ( const UInt partIdx, const UInt partAddr, const Re
   while (pInfo->iN < AMVP_MAX_NUM_CANDS)
   {
     pInfo->m_acMvCand[pInfo->iN].set(0,0);
+    LAB_INTER(this,partIdx,"AMVP_SOURCE",",\"list\":"<<Int(eRefPicList)<<",\"ref\":"<<refIdx<<",\"source\":\"ZERO\",\"status\":\"ADDED\",\"candidate\":"<<pInfo->iN<<",\"mv\":[0,0]");
     pInfo->iN++;
   }
   return ;
